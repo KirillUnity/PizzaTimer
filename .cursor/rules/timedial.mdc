@@ -1,0 +1,59 @@
+---
+description: TimeDial Android-first architecture, Canvas, MVI, and stack constraints
+alwaysApply: true
+---
+
+# TimeDial Planner — Cursor rules
+
+You are implementing **TimeDial**: a day planner drawn as a clock, not a list. This repo is **Android-first** Jetpack Compose (`:app`, `com.example.clockplannerproject`, minSdk 29). Do not start Kotlin Multiplatform, iOS, Hilt, Google Calendar, or extra Gradle modules unless the user explicitly asks.
+
+Follow [AGENTS.md](AGENTS.md), [docs/TZ.md](docs/TZ.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the current day in [docs/DAILY_PROMPTS.md](docs/DAILY_PROMPTS.md).
+
+## Stack
+
+- Kotlin 2, Jetpack Compose, Material 3, NavigationSuiteScaffold
+- MVI: `UiState` / `UiIntent` / `UiEffect`
+- DI: Koin only
+- Room + DataStore; Coroutines + Flow
+- kotlinx-datetime in `kit.core` (no `java.time` there)
+
+## Language
+
+- User-facing replies: Russian (unless the user writes English)
+- Code, KDoc, comments, commits: English
+- Conventional Commits; no commit/tag/push unless asked
+
+## Packages (inside `:app`)
+
+- `kit.core` — Task, TimeBlock, Importance, repositories, `TimeMath`, leftover layout, `TimeDialConfig`
+- `kit.render` — Canvas, `DialRenderer` strategies, hit-test
+- `kit.compose` — `TimeDial` and related composables
+- `data` — Room/DataStore implementations
+- `ui.*` — screens only
+
+`kit.render` must not depend on Room or screens. UI must not duplicate angle math or leftover shares.
+
+## Product rules
+
+- Colored sectors, task labels, tap → full description (sheet)
+- `DONE` uses `completedColor` (gray)
+- Hide completed **reflows** remaining work across the dial (not filter-only) in compact mode; wall-clock mode keeps real hours; LIST only filters
+- Untimed tasks fill leftover minutes (former Rest) via `kit.core.layout`; importance HIGH:MEDIUM:LOW = 5:3:2; timed tasks stay civil
+- Closed time blocks are immutable; Start/Pause **appends** a new `TimeBlock`
+- Gestures: scene rotation via `userRotationOffset`; resize only unclosed blocks; keep `autoNowRotation` so **now stays at 12 o’clock** unless the user offset is applied
+- View modes: DIAL, PIZZA, PETALS, LIST — new mode = new renderer (LIST is Compose, not Canvas)
+- No Room `Migration` classes: `fallbackToDestructiveMigration()`; schema bump wipes the DB (reinstall)
+
+## Canvas performance
+
+- `drawWithCache`, `derivedStateOf`, remembered `Path`/`Paint`/`TextMeasurer`
+- No allocations inside `draw()`
+- Named geometry constants, no magic numbers
+
+## Quality
+
+- KDoc on public APIs (`@param`, behavior, `@since` when adding library-facing types)
+- `@Immutable` on config data classes
+- `@Preview` on public composables
+- Unit tests for `TimeMath`, hit-test, reflow, stats, repository
+- Do not expand scope past the day’s Non-goals

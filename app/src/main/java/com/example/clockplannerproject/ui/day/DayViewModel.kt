@@ -1,0 +1,250 @@
+package com.example.clockplannerproject.ui.day
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.clockplannerproject.data.SampleDaySeeder
+import com.example.clockplannerproject.kit.core.TaskRepository
+import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TimeProvider
+import com.example.clockplannerproject.kit.core.time.TimeMath
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+/**
+ * Day screen ViewModel. Depends on repository, clock, and debug seeder — no Android Context.
+ *
+ * @since 0.1.0
+ */
+class DayViewModel(
+    private val taskRepository: TaskRepository,
+    private val timeProvider: TimeProvider,
+    private val sampleDaySeeder: SampleDaySeeder,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(DayUiState())
+    val state: StateFlow<DayUiState> = _state.asStateFlow()
+
+    private val effects = Channel<DayUiEffect>(Channel.BUFFERED)
+    val effect = effects.receiveAsFlow()
+
+    private val retryTick = MutableStateFlow(0)
+
+    init {
+        observeDay()
+    }
+
+    fun onIntent(intent: DayUiIntent) {
+        when (intent) {
+            DayUiIntent.Retry -> retryTick.update { it + 1 }
+            is DayUiIntent.SelectTask -> _state.update { it.copy(selectedTask = intent.task) }
+            DayUiIntent.DismissTask -> _state.update { it.copy(selectedTask = null) }
+            DayUiIntent.ToggleComplete -> toggleComplete()
+            DayUiIntent.EditTask -> openEditor()
+            DayUiIntent.RequestDelete -> _state.update { it.copy(pendingDelete = it.selectedTask) }
+            DayUiIntent.ConfirmDelete -> confirmDelete()
+            DayUiIntent.DismissDelete -> _state.update { it.copy(pendingDelete = null) }
+            is DayUiIntent.RotateBy -> _state.update {
+                it.copy(
+                    userRotationOffsetDeg = TimeMath.normalizeDegrees(
+                        it.userRotationOffsetDeg + intent.deltaDeg,
+                    ),
+                )
+            }
+            DayUiIntent.ResetRotation -> _state.update { it.copy(userRotationOffsetDeg = 0f) }
+            is DayUiIntent.ResizePreview -> {
+                val task = _state.value.tasks.find { it.id == intent.taskId }
+                val nowMinute = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: 0
+                val closed = task?.blocks?.find { it.startMinute == intent.blockStartMinute }
+                    ?.isClosed(nowMinute) == true
+                if (!closed) {
+                    _state.update {
+                        it.copy(
+                            resizingTaskId = intent.taskId,
+                            resizePreviewEndMinute = intent.endMinute,
+                            resizeBlockStartMinute = intent.blockStartMinute,
+                        )
+                    }
+                }
+            }
+            is DayUiIntent.ResizeTask -> resizeTask(intent)
+            DayUiIntent.CancelResize -> clearResizePreview()
+            DayUiIntent.ToggleHideCompleted -> _state.update {
+                it.copy(hideCompleted = !it.hideCompleted)
+            }
+            is DayUiIntent.SetViewMode -> _state.update { it.copy(viewMode = intent.mode) }
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeDay() {
+        viewModelScope.launch {
+            retryTick.collectLatest {
+                _state.update { it.copy(isLoading = true, errorMessage = null) }
+                try {
+                    try {
+                        sampleDaySeeder.seedIfEmpty()
+                    } catch (seedError: Exception) {
+                        effects.send(
+                            DayUiEffect.ShowMessage(
+                                seedError.message ?: "Could not load sample day",
+                            ),
+                        )
+                    }
+                    timeProvider.observeTime()
+                        .map { time -> timeProvider.today() to time }
+                        .distinctUntilChanged()
+                        .flatMapLatest { (date, time) ->
+                            taskRepository.observeTasks(date).map { tasks ->
+                                val selected = _state.value.selectedTask?.id?.let { id ->
+                                    tasks.find { it.id == id }
+                                }
+                                val pending = _state.value.pendingDelete?.id?.let { id ->
+                                    tasks.find { it.id == id }
+                                }
+                                DayUiState(
+                                    date = date,
+                                    now = time,
+                                    tasks = tasks,
+                                    selectedTask = selected,
+                                    pendingDelete = pending,
+                                    isLoading = false,
+                                    errorMessage = null,
+                                    userRotationOffsetDeg = _state.value.userRotationOffsetDeg,
+                                    resizingTaskId = _state.value.resizingTaskId,
+                                    resizePreviewEndMinute = _state.value.resizePreviewEndMinute,
+                                    resizeBlockStartMinute = _state.value.resizeBlockStartMinute,
+                                    hideCompleted = _state.value.hideCompleted,
+                                    viewMode = _state.value.viewMode,
+                                )
+                            }
+                        }
+                        .collect { snapshot -> _state.value = snapshot }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.message ?: error::class.simpleName,
+                        )
+                    }
+                    effects.send(
+                        DayUiEffect.ShowMessage(error.message ?: "Could not load the day"),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun clearResizePreview() {
+        _state.update {
+            it.copy(
+                resizingTaskId = null,
+                resizePreviewEndMinute = null,
+                resizeBlockStartMinute = null,
+            )
+        }
+    }
+
+    private fun resizeTask(intent: DayUiIntent.ResizeTask) {
+        val snapshot = _state.value
+        val task = snapshot.tasks.find { it.id == intent.taskId } ?: run {
+            clearResizePreview()
+            return
+        }
+        val nowMinute = snapshot.now?.let {
+            TimeMath.minuteOfDay(it).toInt()
+        } ?: 0
+        val match = intent.blockStartMinute
+        val target = task.blocks.find { it.startMinute == match }
+            ?: task.blocks.firstOrNull()
+        if (target != null && target.isClosed(nowMinute)) {
+            clearResizePreview()
+            return
+        }
+        val updated = task.withEndMinute(intent.newEndMinute, intent.blockStartMinute)
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(updated)
+                _state.update { current ->
+                    current.copy(
+                        resizingTaskId = null,
+                        resizePreviewEndMinute = null,
+                        resizeBlockStartMinute = null,
+                        selectedTask = current.selectedTask?.takeIf { it.id == updated.id }
+                            ?: current.selectedTask,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                clearResizePreview()
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not resize task"),
+                )
+            }
+        }
+    }
+
+    private fun toggleComplete() {
+        val task = _state.value.selectedTask ?: return
+        val nextStatus = if (task.status == TaskStatus.DONE) {
+            TaskStatus.TODO
+        } else {
+            TaskStatus.DONE
+        }
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(task.copy(status = nextStatus))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not update task"),
+                )
+            }
+        }
+    }
+
+    private fun openEditor() {
+        val task = _state.value.selectedTask ?: return
+        _state.update { it.copy(selectedTask = null) }
+        viewModelScope.launch {
+            effects.send(DayUiEffect.OpenEditor(task))
+        }
+    }
+
+    private fun confirmDelete() {
+        val task = _state.value.pendingDelete ?: return
+        viewModelScope.launch {
+            try {
+                taskRepository.delete(task.id)
+                _state.update {
+                    it.copy(
+                        pendingDelete = null,
+                        selectedTask = it.selectedTask?.takeUnless { selected ->
+                            selected.id == task.id
+                        },
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not delete task"),
+                )
+            }
+        }
+    }
+}

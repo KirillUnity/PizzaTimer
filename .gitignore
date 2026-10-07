@@ -1,0 +1,55 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Kotlin incremental / compiler daemon
+.kotlin/
+
+# Local SDK / signing (never commit)
+local.properties
+*.jks
+*.keystore
+*.pem
+
+# Android / Java artifacts
+*.apk
+*.aab
+*.ap_
+*.aar
+*.dex
+*.class
+*.hprof
+bin/
+gen/
+out/
+release/
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# Project export
+/dist/
+
+# Logs and OS
+*.log
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Cursor / editor local state (keep committed rules)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# Optional secrets
+google-services.json
+.env
+.env.*
