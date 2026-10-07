@@ -2,7 +2,11 @@ package com.example.clockplannerproject.ui.task
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
+import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskDraftValidator
+import com.example.clockplannerproject.kit.core.TaskId
+import com.example.clockplannerproject.kit.core.TaskInstances
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
@@ -21,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import java.util.UUID
 
 /**
  * Tasks list and editor. Persistence goes through [TaskRepository]; the Day
@@ -46,6 +51,7 @@ class TasksViewModel(
 
     private val effects = Channel<TasksUiEffect>(Channel.BUFFERED)
     val effect = effects.receiveAsFlow()
+    private val materializer = RecurrenceMaterializer(taskRepository)
 
     init {
         observeSelectedDate()
@@ -106,6 +112,11 @@ class TasksViewModel(
                 it.copy(timePicker = TimePickerTarget(intent.index, isStart = false), nowMinute = minuteOfNow())
             }
             TasksUiIntent.DismissTimePicker -> _state.update { it.copy(timePicker = null) }
+            is TasksUiIntent.Duplicate -> duplicate(intent.task)
+            is TasksUiIntent.RequestMove -> _state.update { it.copy(pendingMove = intent.task) }
+            TasksUiIntent.DismissMove -> _state.update { it.copy(pendingMove = null) }
+            is TasksUiIntent.ConfirmMove -> confirmMove(intent.date)
+            is TasksUiIntent.ChangeRecurrence -> updateEditor { it.copy(recurrence = intent.rule) }
         }
     }
 
@@ -115,6 +126,7 @@ class TasksViewModel(
             try {
                 selectedDate
                     .flatMapLatest { date ->
+                        materializer.ensureVisibleDay(date)
                         taskRepository.observeTasks(date).map { tasks -> date to tasks }
                     }
                     .collect { (date, tasks) ->
@@ -210,6 +222,7 @@ class TasksViewModel(
                 isLoading = true,
                 editor = null,
                 pendingDelete = null,
+                pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
                 tagFilter = null,
@@ -224,10 +237,46 @@ class TasksViewModel(
                 isLoading = true,
                 editor = null,
                 pendingDelete = null,
+                pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
                 tagFilter = null,
             )
+        }
+    }
+
+    private fun duplicate(task: Task) {
+        val copy = TaskInstances.duplicated(
+            task,
+            TaskId(UUID.randomUUID().toString()),
+            _state.value.date ?: task.date,
+        )
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(copy)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    TasksUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
+                )
+            }
+        }
+    }
+
+    private fun confirmMove(date: LocalDate) {
+        val task = _state.value.pendingMove ?: return
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(TaskInstances.moved(task, date))
+                _state.update { it.copy(pendingMove = null) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task"),
+                )
+            }
         }
     }
 

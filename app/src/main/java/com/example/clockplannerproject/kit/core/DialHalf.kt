@@ -44,7 +44,8 @@ data class TaskSlice(
  */
 fun clipTaskToHalf(task: Task, half: DialHalf): List<TaskSlice> =
     task.blocks.flatMap { block ->
-        unfoldTaskIntervals(block.startMinute, block.endMinute).mapNotNull { (start, end) ->
+        val civilEnd = block.endMinute ?: return@flatMap emptyList()
+        unfoldTaskIntervals(block.startMinute, civilEnd).mapNotNull { (start, end) ->
             val left = max(start, half.startMinute)
             val right = min(end, half.endMinute)
             if (right > left) TaskSlice(task, left, right) else null

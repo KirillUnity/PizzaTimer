@@ -5,7 +5,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -21,8 +23,11 @@ import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.clipTaskToHalf
+import com.example.clockplannerproject.kit.core.halfAnchorMinute
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.layout.Reflow
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
@@ -53,6 +58,9 @@ fun TimeDial(
     onResizePreview: (Task, Int) -> Unit = { _, _ -> },
     onResizeCommit: (Task, Int) -> Unit = { _, _ -> },
     onResizeCancel: () -> Unit = {},
+    onStartTimer: () -> Unit = {},
+    onPauseTimer: () -> Unit = {},
+    onDismissSelection: () -> Unit = {},
 ) {
     val completed = remember(config.colors.completedArgb) {
         argbToColor(config.colors.completedArgb)
@@ -71,9 +79,15 @@ fun TimeDial(
     }
     val restTitle = stringResource(R.string.dial_rest)
     val date = tasks.firstOrNull()?.date ?: LocalDate(2026, 1, 1)
+    val nowMinute by remember(currentTime) {
+        derivedStateOf {
+            currentTime?.let { TimeMath.minuteOfDay(it) } ?: 0f
+        }
+    }
     val compact = config.clock.reflowMode == ReflowMode.CompactRemaining
-    val laidOut = remember(tasks, half, config.clock.reflowMode) {
-        Reflow.layout(tasks, half, config.clock.reflowMode).map { slice ->
+    val nowMinuteInt = nowMinute.toInt()
+    val laidOut = remember(tasks, half, config.clock.reflowMode, nowMinuteInt) {
+        Reflow.layout(tasks, half, config.clock.reflowMode, nowMinuteInt).map { slice ->
             val civil = if (slice.task.isUntimed) {
                 slice.task.title
             } else {
@@ -96,11 +110,6 @@ fun TimeDial(
             else sectorColor(task, completed, argbToColor(task.colorArgb))
         }
     }
-    val nowMinute by remember(currentTime) {
-        derivedStateOf {
-            currentTime?.let { TimeMath.minuteOfDay(it) } ?: 0f
-        }
-    }
     val pulse = rememberInfiniteTransition(label = "focusChevron")
     val markerAlpha by pulse.animateFloat(
         initialValue = 0.55f,
@@ -111,32 +120,52 @@ fun TimeDial(
         ),
         label = "focusAlpha",
     )
-    val accessibilityTasks = remember(tasks, half) {
-        tasks.filter { clipTaskToHalf(it, half).isNotEmpty() }
+    val accessibilityTasks = remember(tasks, half, nowMinuteInt) {
+        tasks.filter { clipTaskToHalf(it.resolveOpenBlocks(nowMinuteInt), half).isNotEmpty() }
     }
-    DialView(
-        tasks = withRest,
-        sectorColors = sectorColors,
-        markerColor = marker,
-        config = config,
-        nowMinute = nowMinute,
-        half = half,
-        onTaskClick = { layoutTask ->
-            val original = tasks.find { it.id == layoutTask.id } ?: layoutTask
-            onTaskClick(original)
-        },
-        modifier = modifier,
-        nowMarkerContentDescription = stringResource(R.string.cd_now_marker),
-        onUserRotationDelta = onUserRotationDelta,
-        selectedTask = selectedTask,
-        handleColor = handle,
-        focusColor = focus,
-        markerAlpha = markerAlpha,
-        onResizePreview = onResizePreview,
-        onResizeCommit = onResizeCommit,
-        onResizeCancel = onResizeCancel,
-        accessibilityTasks = accessibilityTasks,
-    )
+    val anchorMinute = if (config.clock.snapToNow && !compact) {
+        halfAnchorMinute(nowMinute, half, withRest)
+    } else {
+        half.startMinute.toFloat()
+    }
+    BoxWithConstraints(modifier = modifier) {
+        DialView(
+            tasks = withRest,
+            sectorColors = sectorColors,
+            markerColor = marker,
+            config = config,
+            nowMinute = nowMinute,
+            half = half,
+            onTaskClick = { layoutTask ->
+                val original = tasks.find { it.id == layoutTask.id } ?: layoutTask
+                onTaskClick(original)
+            },
+            modifier = Modifier.fillMaxSize(),
+            nowMarkerContentDescription = stringResource(R.string.cd_now_marker),
+            onUserRotationDelta = onUserRotationDelta,
+            selectedTask = selectedTask,
+            handleColor = handle,
+            focusColor = focus,
+            markerAlpha = markerAlpha,
+            onResizePreview = onResizePreview,
+            onResizeCommit = onResizeCommit,
+            onResizeCancel = onResizeCancel,
+            accessibilityTasks = accessibilityTasks,
+        )
+        selectedTask?.let { selected ->
+            SelectedTaskOverlays(
+                task = selected,
+                half = half,
+                nowMinute = nowMinuteInt,
+                anchorMinute = anchorMinute,
+                config = config,
+                constraints = constraints,
+                onDismiss = onDismissSelection,
+                onStartTimer = onStartTimer,
+                onPauseTimer = onPauseTimer,
+            )
+        }
+    }
 }
 
 internal fun argbToColor(argb: Long): Color = Color(argb.toInt())
@@ -324,6 +353,28 @@ private fun TimeDialSportBlocksPreview() {
             tasks = listOf(SampleTasks.sportTwoBlocks(LocalDate(2026, 10, 6))),
             currentTime = LocalTime(8, 30, 0),
             half = DialHalf.AM,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Sport 8–9 plus live 12→now")
+@Composable
+private fun TimeDialLiveTimerPreview() {
+    val date = LocalDate(2026, 10, 6)
+    val sport = SampleTasks.sportTwoBlocks(date).copy(
+        blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, endMinute = null)),
+        status = TaskStatus.IN_PROGRESS,
+    )
+    ClockPlannerProjectTheme {
+        TimeDial(
+            tasks = listOf(sport),
+            currentTime = LocalTime(12, 30, 0),
+            half = DialHalf.PM,
+            selectedTask = sport,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)

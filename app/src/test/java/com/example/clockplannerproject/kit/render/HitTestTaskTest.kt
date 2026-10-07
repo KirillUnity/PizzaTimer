@@ -45,6 +45,21 @@ class HitTestTaskTest {
     }
 
     @Test
+    fun twoBlocks_sameTaskId() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, 13 * 60)),
+            date = day,
+        )
+        val ring = layoutRing(canvas, geometry)
+        val tap = Offset(ring.center.x, ring.center.y - ring.midRadius)
+        assertEquals(sport.id, hit(tap, listOf(sport), nowMinute = 8 * 60f, half = DialHalf.AM)?.id)
+        assertEquals(sport.id, hit(tap, listOf(sport), nowMinute = 12 * 60f, half = DialHalf.PM)?.id)
+    }
+
+    @Test
     fun center_isMiss() {
         assertNull(hit(Offset(100f, 100f), nowMinute = 9 * 60f, half = DialHalf.AM))
     }

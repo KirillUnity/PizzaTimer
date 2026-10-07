@@ -44,4 +44,17 @@ class RoomTaskRepository(
             taskDao.deleteById(taskId.value)
         }
     }
+
+    override suspend fun get(taskId: TaskId): Task? = withContext(ioDispatcher) {
+        taskDao.getById(taskId.value)?.toDomain()
+    }
+
+    override suspend fun listRecurringTemplates(): List<Task> = withContext(ioDispatcher) {
+        taskDao.listRecurring().map { it.toDomain() }
+    }
+
+    override suspend fun hasSeriesOnDate(seriesId: String, date: LocalDate): Boolean =
+        withContext(ioDispatcher) {
+            taskDao.countSeriesOnDate(seriesId, date.toString()) > 0
+        }
 }

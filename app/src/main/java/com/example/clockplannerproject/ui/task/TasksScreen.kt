@@ -62,6 +62,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
 import com.example.clockplannerproject.kit.core.Importance
+import com.example.clockplannerproject.kit.core.RecurrenceRule
+import kotlinx.datetime.DayOfWeek
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskPalette
@@ -173,6 +175,8 @@ fun TasksScreen(
                             task = task,
                             onEdit = { onIntent(TasksUiIntent.Edit(task)) },
                             onDelete = { onIntent(TasksUiIntent.Delete(task)) },
+                            onDuplicate = { onIntent(TasksUiIntent.Duplicate(task)) },
+                            onMove = { onIntent(TasksUiIntent.RequestMove(task)) },
                         )
                     }
                     item { Spacer(Modifier.height(24.dp)) }
@@ -244,6 +248,8 @@ private fun TaskListRow(
     task: Task,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
+    onMove: () -> Unit = {},
 ) {
     val colorCd = stringResource(R.string.cd_task_color, task.title)
     ListItem(
@@ -269,11 +275,19 @@ private fun TaskListRow(
             )
         },
         trailingContent = {
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.cd_delete_task, task.title),
-                )
+            Row {
+                TextButton(onClick = onMove) {
+                    Text(stringResource(R.string.task_move))
+                }
+                TextButton(onClick = onDuplicate) {
+                    Text(stringResource(R.string.task_duplicate))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.cd_delete_task, task.title),
+                    )
+                }
             }
         },
         modifier = Modifier.clickable(onClick = onEdit),
@@ -310,7 +324,11 @@ fun TaskEditorOverlays(
         val block = editorForPicker.blocks.getOrNull(picker.blockIndex)
         if (block != null) {
             ClockTimePickerDialog(
-                minuteOfDay = if (picker.isStart) block.startMinute else block.endMinute,
+                minuteOfDay = if (picker.isStart) {
+                    block.startMinute
+                } else {
+                    block.endMinute ?: block.startMinute
+                },
                 title = stringResource(
                     if (picker.isStart) R.string.task_start else R.string.task_end,
                 ),
@@ -350,6 +368,14 @@ fun TaskEditorOverlays(
             selectedDate = state.date,
             onConfirm = { onIntent(TasksUiIntent.SelectDate(it)) },
             onDismiss = { onIntent(TasksUiIntent.DismissDatePicker) },
+        )
+    }
+
+    state.pendingMove?.let { moving ->
+        TaskDatePickerDialog(
+            selectedDate = moving.date,
+            onConfirm = { onIntent(TasksUiIntent.ConfirmMove(it)) },
+            onDismiss = { onIntent(TasksUiIntent.DismissMove) },
         )
     }
 }
@@ -485,6 +511,11 @@ private fun TaskEditorSheet(
                 onAdd = { onIntent(TasksUiIntent.AddTag) },
                 onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
             )
+            Spacer(Modifier.height(12.dp))
+            RecurrenceEditor(
+                rule = editor.recurrence,
+                onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+            )
             Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.task_intervals),
@@ -499,12 +530,14 @@ private fun TaskEditorSheet(
             }
             editor.blocks.forEachIndexed { index, block ->
                 val closed = block.isClosed(nowMinute)
+                val end = block.endMinute
                 IntervalRow(
                     block = block,
                     readOnly = closed,
-                    overnight = block.endMinute.mod(TimeMath.MINUTES_PER_DAY) <
-                        block.startMinute.mod(TimeMath.MINUTES_PER_DAY) &&
-                        block.endMinute != TimeMath.MINUTES_PER_DAY,
+                    overnight = end != null &&
+                        end != TimeMath.MINUTES_PER_DAY &&
+                        end.mod(TimeMath.MINUTES_PER_DAY) <
+                        block.startMinute.mod(TimeMath.MINUTES_PER_DAY),
                     onStart = { onIntent(TasksUiIntent.OpenStartPicker(index)) },
                     onEnd = { onIntent(TasksUiIntent.OpenEndPicker(index)) },
                     onRemove = { onIntent(TasksUiIntent.RemoveBlock(index)) },
@@ -714,7 +747,7 @@ private fun IntervalRow(
                 Text(
                     text = stringResource(
                         R.string.task_end_value,
-                        TimeMath.formatMinuteOfDay(block.endMinute),
+                        block.endMinute?.let { TimeMath.formatMinuteOfDay(it) } ?: "…",
                     ),
                 )
             }
@@ -736,6 +769,71 @@ private fun IntervalRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
+        }
+    }
+}
+
+@Composable
+private fun RecurrenceEditor(
+    rule: RecurrenceRule,
+    onChange: (RecurrenceRule) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.task_recurrence),
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = rule is RecurrenceRule.None,
+            onClick = { onChange(RecurrenceRule.None) },
+            label = { Text(stringResource(R.string.task_recurrence_none)) },
+        )
+        FilterChip(
+            selected = rule is RecurrenceRule.Daily,
+            onClick = { onChange(RecurrenceRule.Daily) },
+            label = { Text(stringResource(R.string.task_recurrence_daily)) },
+        )
+        FilterChip(
+            selected = rule is RecurrenceRule.Weekdays,
+            onClick = {
+                onChange(
+                    RecurrenceRule.Weekdays(
+                        setOf(
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ),
+                    ),
+                )
+            },
+            label = { Text(stringResource(R.string.task_recurrence_weekdays)) },
+        )
+    }
+    if (rule is RecurrenceRule.Weekdays) {
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            DayOfWeek.entries.forEach { day ->
+                val selected = day in rule.days
+                FilterChip(
+                    selected = selected,
+                    onClick = {
+                        val next = if (selected) rule.days - day else rule.days + day
+                        onChange(
+                            if (next.isEmpty()) RecurrenceRule.None else RecurrenceRule.Weekdays(next),
+                        )
+                    },
+                    label = { Text(day.name.take(3)) },
+                )
+            }
         }
     }
 }

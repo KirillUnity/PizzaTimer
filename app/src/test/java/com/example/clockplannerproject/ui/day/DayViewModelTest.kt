@@ -150,6 +150,31 @@ class DayViewModelTest {
     }
 
     @Test
+    fun selectTask_secondTapDismisses() {
+        val viewModel = dayViewModel(listOf(work))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        assertNull(viewModel.state.value.selectedTask)
+    }
+
+    @Test
+    fun startThenPause_appendsSecondBlock() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single()
+        assertEquals(2, started.blocks.size)
+        assertEquals(null, started.blocks.last().endMinute)
+        assertEquals(TimeBlock(9 * 60, 12 * 60), started.blocks.first())
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        val paused = later.state.value.tasks.single()
+        assertEquals(TimeBlock(9 * 60, 12 * 60), paused.blocks.first())
+        assertEquals(TimeBlock(12 * 60, 13 * 60), paused.blocks.last())
+    }
+
+    @Test
     fun confirmDelete_removesTaskAndSheet() {
         val viewModel = dayViewModel(listOf(work))
         viewModel.onIntent(DayUiIntent.SelectTask(work))
@@ -160,8 +185,11 @@ class DayViewModelTest {
         assertNull(viewModel.state.value.pendingDelete)
     }
 
-    private fun dayViewModel(initial: List<Task>): DayViewModel {
-        val time = FakeTimeProvider(date)
+    private fun dayViewModel(
+        initial: List<Task>,
+        clock: LocalTime = LocalTime(9, 30),
+    ): DayViewModel {
+        val time = FakeTimeProvider(date, clock)
         val repository = FakeTaskRepository(initial)
         return DayViewModel(
             taskRepository = repository,
@@ -186,6 +214,16 @@ private class FakeTaskRepository(
     override suspend fun delete(taskId: TaskId) {
         items.update { current -> current.filterNot { it.id == taskId } }
     }
+
+    override suspend fun get(taskId: TaskId): Task? = items.value.find { it.id == taskId }
+
+    override suspend fun listRecurringTemplates(): List<Task> =
+        items.value.filter { it.recurrence !is com.example.clockplannerproject.kit.core.RecurrenceRule.None }
+
+    override suspend fun hasSeriesOnDate(seriesId: String, date: LocalDate): Boolean =
+        items.value.any { task ->
+            task.date == date && (task.seriesId == seriesId || task.id.value == seriesId)
+        }
 }
 
 private class FakeTimeProvider(

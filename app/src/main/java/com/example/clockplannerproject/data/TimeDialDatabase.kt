@@ -8,10 +8,9 @@ import androidx.room.RoomDatabase
 /**
  * Local TimeDial database.
  *
- * Schema v2:
- * `tasks(id TEXT PK, title TEXT, description TEXT, colorArgb INTEGER,
- * status TEXT, dateIso TEXT, importance TEXT, tagsCsv TEXT)`
- * `time_blocks(id TEXT PK, taskId TEXT FK, startMinute INTEGER, endMinute INTEGER, sortIndex INTEGER)`
+ * Schema v3:
+ * `tasks(..., recurrenceKind TEXT, weekdaysMask INTEGER, seriesId TEXT)`
+ * `time_blocks(..., endMinute INTEGER nullable for open timer)`
  *
  * **No Room `Migration` class.** Version bumps use
  * [fallbackToDestructiveMigration] only. Installing an app update that
@@ -22,7 +21,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [TaskEntity::class, TimeBlockEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class TimeDialDatabase : RoomDatabase() {

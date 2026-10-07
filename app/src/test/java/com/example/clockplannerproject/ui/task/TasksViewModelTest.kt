@@ -163,6 +163,47 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun duplicate_createsIndependentCopy() {
+        val task = Task(
+            id = TaskId("keep"),
+            title = "Focus",
+            colorArgb = 0xFF3949AB,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+            tags = listOf("code"),
+        )
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        viewModel.onIntent(TasksUiIntent.Duplicate(task))
+        assertEquals(2, viewModel.state.value.tasks.size)
+        val copy = viewModel.state.value.tasks.single { it.id != task.id }
+        viewModel.onIntent(TasksUiIntent.Edit(copy))
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Copy"))
+        viewModel.onIntent(TasksUiIntent.Update)
+        val titles = viewModel.state.value.tasks.map { it.title }.toSet()
+        assertTrue("Focus" in titles)
+        assertTrue("Copy" in titles)
+    }
+
+    @Test
+    fun confirmMove_changesObservedDay() {
+        val task = Task(
+            id = TaskId("keep"),
+            title = "Focus",
+            colorArgb = 0xFF3949AB,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val dest = LocalDate(2026, 10, 8)
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        viewModel.onIntent(TasksUiIntent.RequestMove(task))
+        viewModel.onIntent(TasksUiIntent.ConfirmMove(dest))
+        assertTrue(viewModel.state.value.tasks.isEmpty())
+        viewModel.onIntent(TasksUiIntent.SelectDate(dest))
+        assertEquals("Focus", viewModel.state.value.tasks.single().title)
+        assertEquals(task.id, viewModel.state.value.tasks.single().id)
+    }
+
+    @Test
     fun filterByTag_narrowsList() {
         val work = Task(
             id = TaskId("a"),
@@ -200,6 +241,16 @@ private class FakeTaskRepository(
     override suspend fun delete(taskId: TaskId) {
         items.update { current -> current.filterNot { it.id == taskId } }
     }
+
+    override suspend fun get(taskId: TaskId): Task? = items.value.find { it.id == taskId }
+
+    override suspend fun listRecurringTemplates(): List<Task> =
+        items.value.filter { it.recurrence !is com.example.clockplannerproject.kit.core.RecurrenceRule.None }
+
+    override suspend fun hasSeriesOnDate(seriesId: String, date: LocalDate): Boolean =
+        items.value.any { task ->
+            task.date == date && (task.seriesId == seriesId || task.id.value == seriesId)
+        }
 }
 
 private class FakeTimeProvider(

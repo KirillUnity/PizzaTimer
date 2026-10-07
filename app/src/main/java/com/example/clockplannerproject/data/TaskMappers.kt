@@ -1,6 +1,7 @@
 package com.example.clockplannerproject.data
 
 import com.example.clockplannerproject.kit.core.Importance
+import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskStatus
@@ -19,6 +20,8 @@ internal fun TaskEntity.toDomain(blocks: List<TimeBlockEntity>): Task = Task(
     date = LocalDate.parse(dateIso),
     importance = runCatching { Importance.valueOf(importance) }.getOrDefault(Importance.MEDIUM),
     tags = decodeTags(tagsCsv),
+    recurrence = decodeRecurrence(recurrenceKind, weekdaysMask),
+    seriesId = seriesId,
 )
 
 internal fun TaskWithBlocks.toDomain(): Task = task.toDomain(blocks)
@@ -32,6 +35,9 @@ internal fun Task.toEntity(): TaskEntity = TaskEntity(
     dateIso = date.toString(),
     importance = importance.name,
     tagsCsv = encodeTags(tags),
+    recurrenceKind = encodeRecurrenceKind(recurrence),
+    weekdaysMask = encodeWeekdaysMask(recurrence),
+    seriesId = seriesId,
 )
 
 internal fun Task.toBlockEntities(): List<TimeBlockEntity> =
@@ -55,3 +61,23 @@ internal fun encodeTags(tags: List<String>): String =
 
 internal fun decodeTags(csv: String): List<String> =
     if (csv.isEmpty()) emptyList() else csv.split(TAGS_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
+
+internal fun decodeRecurrence(kind: String, mask: Int): RecurrenceRule = when (kind) {
+    "DAILY" -> RecurrenceRule.Daily
+    "WEEKDAYS" -> {
+        val days = RecurrenceRule.daysFromMask(mask)
+        if (days.isEmpty()) RecurrenceRule.None else RecurrenceRule.Weekdays(days)
+    }
+    else -> RecurrenceRule.None
+}
+
+internal fun encodeRecurrenceKind(rule: RecurrenceRule): String = when (rule) {
+    RecurrenceRule.None -> "NONE"
+    RecurrenceRule.Daily -> "DAILY"
+    is RecurrenceRule.Weekdays -> "WEEKDAYS"
+}
+
+internal fun encodeWeekdaysMask(rule: RecurrenceRule): Int = when (rule) {
+    is RecurrenceRule.Weekdays -> RecurrenceRule.maskFor(rule.days)
+    else -> 0
+}

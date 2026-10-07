@@ -55,6 +55,9 @@ fun DualTimeDial(
     onResizePreview: (Task, Int) -> Unit = { _, _ -> },
     onResizeCommit: (Task, Int) -> Unit = { _, _ -> },
     onResizeCancel: () -> Unit = {},
+    onStartTimer: () -> Unit = {},
+    onPauseTimer: () -> Unit = {},
+    onDismissSelection: () -> Unit = {},
 ) {
     val halves = DialHalf.entries
     val nowMinute = currentTime?.let { TimeMath.minuteOfDay(it) }
@@ -95,6 +98,9 @@ fun DualTimeDial(
                     onResizePreview = onResizePreview,
                     onResizeCommit = onResizeCommit,
                     onResizeCancel = onResizeCancel,
+                    onStartTimer = onStartTimer,
+                    onPauseTimer = onPauseTimer,
+                    onDismissSelection = onDismissSelection,
                     modifier = Modifier.size(side),
                 )
             }

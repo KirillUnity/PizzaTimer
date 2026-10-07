@@ -26,10 +26,11 @@ object TaskDraftValidator {
         if (title.isBlank()) return TaskDraftError.EmptyTitle
         for (block in blocks) {
             val start = block.startMinute.mod(TimeMath.MINUTES_PER_DAY)
-            val end = if (block.endMinute == TimeMath.MINUTES_PER_DAY) {
+            val endRaw = block.endMinute ?: continue
+            val end = if (endRaw == TimeMath.MINUTES_PER_DAY) {
                 TimeMath.MINUTES_PER_DAY
             } else {
-                block.endMinute.mod(TimeMath.MINUTES_PER_DAY)
+                endRaw.mod(TimeMath.MINUTES_PER_DAY)
             }
             if (start == end) return TaskDraftError.EndEqualsStart
         }

@@ -45,6 +45,8 @@ fun TaskBottomSheet(
     onToggleComplete: () -> Unit = {},
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
+    onDuplicate: () -> Unit = {},
+    onMove: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -62,6 +64,8 @@ fun TaskBottomSheet(
             onToggleComplete = onToggleComplete,
             onEdit = onEdit,
             onDelete = onDelete,
+            onDuplicate = onDuplicate,
+            onMove = onMove,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Spacer(Modifier.height(24.dp))
@@ -117,6 +121,8 @@ fun TaskBottomSheetActions(
     onToggleComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
+    onMove: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -133,6 +139,12 @@ fun TaskBottomSheetActions(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
+            TextButton(onClick = onMove) {
+                Text(stringResource(R.string.task_move))
+            }
+            TextButton(onClick = onDuplicate) {
+                Text(stringResource(R.string.task_duplicate))
+            }
             TextButton(onClick = onEdit) {
                 Text(stringResource(R.string.task_edit))
             }

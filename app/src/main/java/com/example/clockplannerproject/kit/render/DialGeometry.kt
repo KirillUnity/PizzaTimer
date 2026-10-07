@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.clipTaskToHalf
 import com.example.clockplannerproject.kit.core.config.GeometryConfig
@@ -70,12 +71,19 @@ fun layoutDurationMinutes(startMinute: Int, endMinute: Int): Int =
  *
  * @since 0.2.0
  */
-fun paintOrderedTasks(tasks: List<Task>): List<Task> =
-    tasks.sortedWith(
+fun paintOrderedTasks(
+    tasks: List<Task>,
+    selectedTaskId: TaskId? = null,
+): List<Task> {
+    val ordered = tasks.sortedWith(
         compareByDescending<Task> {
             layoutDurationMinutes(it.startMinute, it.endMinute)
         }.thenBy { it.id.value },
     )
+    if (selectedTaskId == null) return ordered
+    val (selected, rest) = ordered.partition { it.id == selectedTaskId }
+    return rest + selected
+}
 
 /**
  * Layout sectors for one 12-hour face. Overnight work is two arcs via
@@ -89,11 +97,12 @@ fun prepareSectors(
     half: DialHalf,
     anchorMinute: Float,
     userRotationOffsetDeg: Float,
+    selectedTaskId: TaskId? = null,
 ): List<PreparedSector> {
     val colorByTask = tasks.mapIndexed { index, task ->
         task.id to colors.getOrElse(index) { Color.Gray }
     }.toMap()
-    return paintOrderedTasks(tasks).flatMap { task ->
+    return paintOrderedTasks(tasks, selectedTaskId).flatMap { task ->
         val color = colorByTask[task.id] ?: Color.Gray
         clipTaskToHalf(task, half).map { slice ->
             val sweep = TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute)

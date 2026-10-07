@@ -54,13 +54,15 @@ object Reflow {
      * @param tasks domain tasks (Rest is ignored)
      * @param half 12-hour face
      * @param mode wall-clock vs compact remaining
+     * @param nowMinute local minute of day; open timer blocks paint start → now
      */
     fun layout(
         tasks: List<Task>,
         half: DialHalf,
         mode: ReflowMode,
+        nowMinute: Int = 0,
     ): List<ReflowSlice> {
-        val real = tasks.filterNot(RestGaps::isRest)
+        val real = tasks.filterNot(RestGaps::isRest).map { it.resolveOpenBlocks(nowMinute) }
         val pool = when (mode) {
             ReflowMode.WallClock -> real
             ReflowMode.CompactRemaining -> real.filter { it.status != TaskStatus.DONE }

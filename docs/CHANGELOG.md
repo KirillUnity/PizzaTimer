@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.0 — 2026-10-07
+
+Week 4: instances and append-only timer.
+
+### Added
+- Move instance to another calendar day (`date` only; blocks and tags kept)
+- Duplicate: new `TaskId`, independent copy of fields, tags, and blocks
+- Recurrence **daily** or **weekdays**; materialize the visible day only (no infinite horizon, no calendar sync)
+- Tap raises the selected sector (paint last); description **callout** on DIAL and PIZZA
+- Start / Pause in the ring hole (and pizza center): Start appends an open `TimeBlock`; Pause closes it at now
+- Open blocks draw start → now via `Reflow.layout(..., nowMinute)`; several sectors share one `TaskId`
+- Room schema **v3** with `fallbackToDestructiveMigration()` — **no `Migration` class**; update wipes local DB
+
+### Not in 0.4
+- Reports, media attachments, stats export (week 5)
+- Appearance DataStore, onboarding, Play upload
+- KMP / iOS, Google/Apple Calendar
+- Git tag (do not tag unless asked)
+
+### Suggested git (do not run unless asked)
+
+```
+git add -A
+git commit -m "feat: ship TimeDial v0.4 instances and timer"
+
+git tag v0.4
+```
+
 ## 0.3.0 — 2026-10-07
 
 Week 3: flexible time, leftover, importance, tags.

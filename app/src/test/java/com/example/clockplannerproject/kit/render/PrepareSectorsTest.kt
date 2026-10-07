@@ -29,6 +29,21 @@ class PrepareSectorsTest {
     )
 
     @Test
+    fun selectedTask_paintsLast() {
+        val long = task("long", 9 * 60, 12 * 60)
+        val short = task("short", 9 * 60, 9 * 60 + 30)
+        val sectors = prepareSectors(
+            tasks = listOf(short, long),
+            colors = listOf(Color.Red, Color.Blue),
+            half = DialHalf.AM,
+            anchorMinute = 9 * 60f,
+            userRotationOffsetDeg = 0f,
+            selectedTaskId = long.id,
+        )
+        assertEquals("long", sectors.last().title)
+    }
+
+    @Test
     fun overlapping_paintsShorterLast() {
         val long = task("long", 9 * 60, 12 * 60)
         val short = task("short", 9 * 60, 9 * 60 + 30)

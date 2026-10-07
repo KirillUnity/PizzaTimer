@@ -32,6 +32,8 @@ enum class TaskStatus {
  * @property colorArgb packed ARGB color, parsed outside the Canvas draw loop.
  * @property importance leftover weight only; ignored for civil blocks.
  * @property tags free-form labels; not a category catalog.
+ * @property recurrence template rule; materialized copies use [RecurrenceRule.None].
+ * @property seriesId shared id for a template and its day instances.
  * @since 0.1.0
  */
 data class Task(
@@ -44,6 +46,8 @@ data class Task(
     val date: LocalDate,
     val importance: Importance = Importance.MEDIUM,
     val tags: List<String> = emptyList(),
+    val recurrence: RecurrenceRule = RecurrenceRule.None,
+    val seriesId: String? = null,
 ) {
     /** True when the task has no civil intervals. */
     val isUntimed: Boolean get() = blocks.isEmpty()
@@ -63,6 +67,17 @@ data class Task(
      * Convenience for single-block overlays and tests. Prefer [blocks].
      */
     val endMinute: Int get() = blocks.lastOrNull()?.endMinute ?: 0
+
+    /**
+     * Replaces open timer ends with [nowMinute] so layout / [clipTaskToHalf]
+     * see civil closed intervals. Stored [blocks] on the real task stay open.
+     *
+     * @since 0.4.0
+     */
+    fun resolveOpenBlocks(nowMinute: Int): Task {
+        if (blocks.none { it.isOpen }) return this
+        return copy(blocks = blocks.map { it.resolveForLayout(nowMinute) })
+    }
 
     /**
      * Replaces civil end of a single block, or the block that covers
@@ -97,7 +112,7 @@ data class Task(
 
 private fun blockCoversMinute(block: TimeBlock, minute: Int): Boolean {
     val start = block.startMinute
-    val end = block.endMinute
+    val end = block.endMinute ?: return minute >= start
     if (end == start) return false
     return if (end > start) {
         minute in start until end

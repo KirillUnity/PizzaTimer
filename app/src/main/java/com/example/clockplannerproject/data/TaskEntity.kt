@@ -27,6 +27,9 @@ data class TaskEntity(
     val dateIso: String,
     val importance: String,
     val tagsCsv: String,
+    val recurrenceKind: String = "NONE",
+    val weekdaysMask: Int = 0,
+    val seriesId: String? = null,
 )
 
 /**
@@ -50,7 +53,7 @@ data class TimeBlockEntity(
     @PrimaryKey val id: String,
     val taskId: String,
     val startMinute: Int,
-    val endMinute: Int,
+    val endMinute: Int?,
     val sortIndex: Int,
 )
 

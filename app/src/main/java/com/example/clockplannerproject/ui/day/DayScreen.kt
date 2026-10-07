@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -39,6 +43,8 @@ import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
 import com.example.clockplannerproject.kit.core.time.TimeMath
+import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
+import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -83,6 +89,12 @@ fun DayRoute(
         onResizeCancel = { viewModel.onIntent(DayUiIntent.CancelResize) },
         onToggleHideCompleted = { viewModel.onIntent(DayUiIntent.ToggleHideCompleted) },
         onSetViewMode = { viewModel.onIntent(DayUiIntent.SetViewMode(it)) },
+        onStartTimer = { viewModel.onIntent(DayUiIntent.StartTimer) },
+        onPauseTimer = { viewModel.onIntent(DayUiIntent.PauseTimer) },
+        onDuplicate = { viewModel.onIntent(DayUiIntent.DuplicateTask) },
+        onRequestMove = { viewModel.onIntent(DayUiIntent.RequestMove) },
+        onConfirmMove = { viewModel.onIntent(DayUiIntent.ConfirmMove(it)) },
+        onDismissMove = { viewModel.onIntent(DayUiIntent.DismissMove) },
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -107,6 +119,12 @@ fun DayScreen(
     onResizeCancel: () -> Unit = {},
     onToggleHideCompleted: () -> Unit = {},
     onSetViewMode: (ViewMode) -> Unit = {},
+    onStartTimer: () -> Unit = {},
+    onPauseTimer: () -> Unit = {},
+    onDuplicate: () -> Unit = {},
+    onRequestMove: () -> Unit = {},
+    onConfirmMove: (LocalDate) -> Unit = {},
+    onDismissMove: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     modifier: Modifier = Modifier,
 ) {
@@ -230,6 +248,9 @@ fun DayScreen(
                         onResizePreview = onResizePreview,
                         onResizeCommit = onResizeCommit,
                         onResizeCancel = onResizeCancel,
+                        onStartTimer = onStartTimer,
+                        onPauseTimer = onPauseTimer,
+                        onDismissSelection = onDismissTask,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -249,6 +270,8 @@ fun DayScreen(
             onToggleComplete = onToggleComplete,
             onEdit = onEditTask,
             onDelete = onRequestDelete,
+            onDuplicate = onDuplicate,
+            onMove = onRequestMove,
         )
     }
     state.pendingDelete?.let { task ->
@@ -267,6 +290,45 @@ fun DayScreen(
                 }
             },
         )
+    }
+    if (state.showMovePicker && state.date != null) {
+        DayMoveDatePicker(
+            selectedDate = state.date,
+            onConfirm = onConfirmMove,
+            onDismiss = onDismissMove,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DayMoveDatePicker(
+    selectedDate: LocalDate,
+    onConfirm: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val pickerState = rememberDatePickerState(
+        initialSelectedDateMillis = selectedDate.toEpochMillisAtStart(),
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = pickerState.selectedDateMillis
+                    if (millis != null) onConfirm(epochMillisToLocalDate(millis)) else onDismiss()
+                },
+            ) {
+                Text(stringResource(R.string.task_picker_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.task_picker_cancel))
+            }
+        },
+    ) {
+        DatePicker(state = pickerState)
     }
 }
 

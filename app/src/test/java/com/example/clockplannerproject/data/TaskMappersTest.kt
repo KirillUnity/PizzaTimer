@@ -1,6 +1,8 @@
 package com.example.clockplannerproject.data
 
 import com.example.clockplannerproject.kit.core.Importance
+import com.example.clockplannerproject.kit.core.RecurrenceRule
+import kotlinx.datetime.DayOfWeek
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskStatus
@@ -27,6 +29,8 @@ class TaskMappersTest {
             date = LocalDate(2026, 10, 6),
             importance = Importance.HIGH,
             tags = listOf("sport", "health"),
+            recurrence = RecurrenceRule.Weekdays(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)),
+            seriesId = "task-2",
         )
         val restored = original.toEntity().toDomain(original.toBlockEntities())
         assertEquals(original, restored)

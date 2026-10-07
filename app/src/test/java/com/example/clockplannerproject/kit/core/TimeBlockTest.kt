@@ -15,6 +15,15 @@ class TimeBlockTest {
     }
 
     @Test
+    fun openTimer_isNeverClosed() {
+        val running = TimeBlock(12 * 60, endMinute = null)
+        assertTrue(running.isOpen)
+        assertFalse(running.isClosed(12 * 60))
+        assertFalse(running.isClosed(13 * 60))
+        assertEquals(13 * 60, running.resolvedEndMinute(13 * 60))
+    }
+
+    @Test
     fun overnight_staysOpenThroughNight() {
         val sleep = TimeBlock(22 * 60, 6 * 60)
         assertFalse(sleep.isClosed(23 * 60))

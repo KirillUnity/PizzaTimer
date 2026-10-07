@@ -1,6 +1,7 @@
 package com.example.clockplannerproject.ui.task
 
 import com.example.clockplannerproject.kit.core.Importance
+import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskId
@@ -24,20 +25,31 @@ data class TaskEditorState(
     val tags: List<String> = emptyList(),
     val tagDraft: String = "",
     val error: TaskDraftError? = null,
+    val recurrence: RecurrenceRule = RecurrenceRule.None,
+    val seriesId: String? = null,
 ) {
     val isNew: Boolean get() = id == null
 
-    fun toTask(date: LocalDate): Task = Task(
-        id = id ?: TaskId(UUID.randomUUID().toString()),
-        title = title.trim(),
-        description = description.trim(),
-        colorArgb = colorArgb,
-        blocks = blocks,
-        status = status,
-        date = date,
-        importance = importance,
-        tags = tags,
-    )
+    fun toTask(date: LocalDate): Task {
+        val resolvedId = id ?: TaskId(UUID.randomUUID().toString())
+        return Task(
+            id = resolvedId,
+            title = title.trim(),
+            description = description.trim(),
+            colorArgb = colorArgb,
+            blocks = blocks,
+            status = status,
+            date = date,
+            importance = importance,
+            tags = tags,
+            recurrence = recurrence,
+            seriesId = if (recurrence is RecurrenceRule.None) {
+                seriesId
+            } else {
+                seriesId ?: resolvedId.value
+            },
+        )
+    }
 
     companion object {
         fun from(task: Task): TaskEditorState = TaskEditorState(
@@ -49,6 +61,8 @@ data class TaskEditorState(
             status = task.status,
             importance = task.importance,
             tags = task.tags,
+            recurrence = task.recurrence,
+            seriesId = task.seriesId,
         )
     }
 }
@@ -69,6 +83,7 @@ data class TasksUiState(
     val errorMessage: String? = null,
     val tagFilter: String? = null,
     val nowMinute: Int = 0,
+    val pendingMove: Task? = null,
 ) : UiState {
     val visibleTasks: List<Task>
         get() {
@@ -111,6 +126,11 @@ sealed interface TasksUiIntent : UiIntent {
     data class OpenStartPicker(val index: Int) : TasksUiIntent
     data class OpenEndPicker(val index: Int) : TasksUiIntent
     data object DismissTimePicker : TasksUiIntent
+    data class Duplicate(val task: Task) : TasksUiIntent
+    data class RequestMove(val task: Task) : TasksUiIntent
+    data object DismissMove : TasksUiIntent
+    data class ConfirmMove(val date: LocalDate) : TasksUiIntent
+    data class ChangeRecurrence(val rule: RecurrenceRule) : TasksUiIntent
 }
 
 sealed interface TasksUiEffect : UiEffect {

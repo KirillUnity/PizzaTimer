@@ -93,4 +93,15 @@
     <string name="category_sleep">Сон</string>
     <string name="category_sport">Спорт</string>
     <string name="category_personal">Личное</string>
+    <string name="task_move">Перенести</string>
+    <string name="task_duplicate">Дублировать</string>
+    <string name="task_recurrence">Повтор</string>
+    <string name="task_recurrence_none">Без повтора</string>
+    <string name="task_recurrence_daily">Ежедневно</string>
+    <string name="task_recurrence_weekdays">Дни недели</string>
+    <string name="timer_start">Старт</string>
+    <string name="timer_pause">Пауза</string>
+    <string name="cd_timer_start">Запустить таймер выбранной задачи</string>
+    <string name="cd_timer_pause">Приостановить таймер выбранной задачи</string>
+    <string name="cd_sector_callout">Описание «%1$s». Нажмите, чтобы закрыть.</string>
 </resources>

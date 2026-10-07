@@ -30,6 +30,7 @@ data class DayUiState(
     val resizeBlockStartMinute: Int? = null,
     val hideCompleted: Boolean = false,
     val viewMode: ViewMode = ViewMode.DIAL,
+    val showMovePicker: Boolean = false,
 ) : UiState {
     val taskCount: Int get() = tasks.size
     val hasUserRotation: Boolean get() = kotlin.math.abs(userRotationOffsetDeg) > 0.5f
@@ -83,6 +84,12 @@ sealed interface DayUiIntent : UiIntent {
     data object CancelResize : DayUiIntent
     data object ToggleHideCompleted : DayUiIntent
     data class SetViewMode(val mode: ViewMode) : DayUiIntent
+    data object DuplicateTask : DayUiIntent
+    data object RequestMove : DayUiIntent
+    data object DismissMove : DayUiIntent
+    data class ConfirmMove(val date: LocalDate) : DayUiIntent
+    data object StartTimer : DayUiIntent
+    data object PauseTimer : DayUiIntent
 }
 
 sealed interface DayUiEffect : UiEffect {

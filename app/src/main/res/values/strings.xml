@@ -93,4 +93,15 @@
     <string name="category_sleep">Sleep</string>
     <string name="category_sport">Sport</string>
     <string name="category_personal">Personal</string>
+    <string name="task_move">Move</string>
+    <string name="task_duplicate">Duplicate</string>
+    <string name="task_recurrence">Repeat</string>
+    <string name="task_recurrence_none">Does not repeat</string>
+    <string name="task_recurrence_daily">Daily</string>
+    <string name="task_recurrence_weekdays">Weekdays</string>
+    <string name="timer_start">Start</string>
+    <string name="timer_pause">Pause</string>
+    <string name="cd_timer_start">Start timer for selected task</string>
+    <string name="cd_timer_pause">Pause timer for selected task</string>
+    <string name="cd_sector_callout">Description for %1$s. Tap to dismiss.</string>
 </resources>

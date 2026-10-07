@@ -117,6 +117,18 @@ object TimeMath {
         "${formatMinuteOfDay(startMinute)} – ${formatMinuteOfDay(endMinute)}"
 
     /**
+     * Open timer slices render as `HH:MM – …`.
+     *
+     * @since 0.4.0
+     */
+    fun formatRange(startMinute: Int, endMinute: Int?): String =
+        if (endMinute == null) {
+            "${formatMinuteOfDay(startMinute)} – …"
+        } else {
+            formatRange(startMinute, endMinute)
+        }
+
+    /**
      * Civil labels for one or many [com.example.clockplannerproject.kit.core.TimeBlock]s.
      * Empty list is untimed — callers should use a UI string, not this.
      *

@@ -3,10 +3,17 @@ package com.example.clockplannerproject.ui.day
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.data.SampleDaySeeder
+import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
+import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskId
+import com.example.clockplannerproject.kit.core.TaskInstances
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.time.TimeMath
+import kotlinx.datetime.LocalDate
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -39,6 +46,7 @@ class DayViewModel(
     val effect = effects.receiveAsFlow()
 
     private val retryTick = MutableStateFlow(0)
+    private val materializer = RecurrenceMaterializer(taskRepository)
 
     init {
         observeDay()
@@ -47,8 +55,16 @@ class DayViewModel(
     fun onIntent(intent: DayUiIntent) {
         when (intent) {
             DayUiIntent.Retry -> retryTick.update { it + 1 }
-            is DayUiIntent.SelectTask -> _state.update { it.copy(selectedTask = intent.task) }
-            DayUiIntent.DismissTask -> _state.update { it.copy(selectedTask = null) }
+            is DayUiIntent.SelectTask -> _state.update {
+                if (it.selectedTask?.id == intent.task.id) {
+                    it.copy(selectedTask = null)
+                } else {
+                    it.copy(selectedTask = intent.task)
+                }
+            }
+            DayUiIntent.DismissTask -> _state.update {
+                it.copy(selectedTask = null, showMovePicker = false)
+            }
             DayUiIntent.ToggleComplete -> toggleComplete()
             DayUiIntent.EditTask -> openEditor()
             DayUiIntent.RequestDelete -> _state.update { it.copy(pendingDelete = it.selectedTask) }
@@ -83,6 +99,12 @@ class DayViewModel(
                 it.copy(hideCompleted = !it.hideCompleted)
             }
             is DayUiIntent.SetViewMode -> _state.update { it.copy(viewMode = intent.mode) }
+            DayUiIntent.DuplicateTask -> duplicateSelected()
+            DayUiIntent.RequestMove -> _state.update { it.copy(showMovePicker = it.selectedTask != null) }
+            DayUiIntent.DismissMove -> _state.update { it.copy(showMovePicker = false) }
+            is DayUiIntent.ConfirmMove -> moveSelected(intent.date)
+            DayUiIntent.StartTimer -> startTimer()
+            DayUiIntent.PauseTimer -> pauseTimer()
         }
     }
 
@@ -101,10 +123,15 @@ class DayViewModel(
                             ),
                         )
                     }
+                    var lastMaterialized: LocalDate? = null
                     timeProvider.observeTime()
                         .map { time -> timeProvider.today() to time }
                         .distinctUntilChanged()
                         .flatMapLatest { (date, time) ->
+                            if (lastMaterialized != date) {
+                                materializer.ensureVisibleDay(date)
+                                lastMaterialized = date
+                            }
                             taskRepository.observeTasks(date).map { tasks ->
                                 val selected = _state.value.selectedTask?.id?.let { id ->
                                     tasks.find { it.id == id }
@@ -126,6 +153,7 @@ class DayViewModel(
                                     resizeBlockStartMinute = _state.value.resizeBlockStartMinute,
                                     hideCompleted = _state.value.hideCompleted,
                                     viewMode = _state.value.viewMode,
+                                    showMovePicker = _state.value.showMovePicker,
                                 )
                             }
                         }
@@ -222,6 +250,69 @@ class DayViewModel(
         _state.update { it.copy(selectedTask = null) }
         viewModelScope.launch {
             effects.send(DayUiEffect.OpenEditor(task))
+        }
+    }
+
+    private fun duplicateSelected() {
+        val task = _state.value.selectedTask ?: return
+        val copy = TaskInstances.duplicated(
+            task,
+            TaskId(UUID.randomUUID().toString()),
+            task.date,
+        )
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(copy)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
+                )
+            }
+        }
+    }
+
+    private fun moveSelected(date: LocalDate) {
+        val task = _state.value.selectedTask ?: return
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(TaskInstances.moved(task, date))
+                _state.update { it.copy(selectedTask = null, showMovePicker = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not move task"),
+                )
+            }
+        }
+    }
+
+    private fun startTimer() {
+        val task = _state.value.selectedTask ?: return
+        val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        if (!TaskTimer.canStart(task)) return
+        persistTimer(TaskTimer.start(task, now))
+    }
+
+    private fun pauseTimer() {
+        val task = _state.value.selectedTask ?: return
+        val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        persistTimer(TaskTimer.pause(task, now))
+    }
+
+    private fun persistTimer(updated: Task) {
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(updated)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    DayUiEffect.ShowMessage(error.message ?: "Could not update timer"),
+                )
+            }
         }
     }
 

@@ -29,4 +29,20 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Transaction
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun getById(id: String): TaskWithBlocks?
+
+    @Transaction
+    @Query("SELECT * FROM tasks WHERE recurrenceKind != 'NONE'")
+    suspend fun listRecurring(): List<TaskWithBlocks>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM tasks
+        WHERE dateIso = :dateIso AND (seriesId = :seriesId OR id = :seriesId)
+        """,
+    )
+    suspend fun countSeriesOnDate(seriesId: String, dateIso: String): Int
 }

@@ -117,6 +117,43 @@ class ReflowTest {
     }
 
     @Test
+    fun wallClock_openBlock_usesNowViaLayoutApi() {
+        val live = Task(
+            id = TaskId("live"),
+            title = "Live",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(
+                TimeBlock(8 * 60, 9 * 60),
+                TimeBlock(12 * 60, endMinute = null),
+            ),
+            date = day,
+        )
+        val am = Reflow.layout(listOf(live), DialHalf.AM, ReflowMode.WallClock, nowMinute = 13 * 60)
+        val pm = Reflow.layout(listOf(live), DialHalf.PM, ReflowMode.WallClock, nowMinute = 13 * 60)
+        assertEquals(8 * 60, am.single().startMinute)
+        assertEquals(9 * 60, am.single().endMinute)
+        assertEquals(12 * 60, pm.single().startMinute)
+        assertEquals(13 * 60, pm.single().endMinute)
+    }
+
+    @Test
+    fun wallClock_twoSportBlocks_firstImmutable() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, 13 * 60)),
+            date = day,
+        )
+        val am = Reflow.layout(listOf(sport), DialHalf.AM, ReflowMode.WallClock)
+        val pm = Reflow.layout(listOf(sport), DialHalf.PM, ReflowMode.WallClock)
+        assertEquals(listOf(8 * 60 to 9 * 60), am.map { it.startMinute to it.endMinute })
+        assertEquals(listOf(12 * 60 to 13 * 60), pm.map { it.startMinute to it.endMinute })
+        assertEquals(sport.id, am.single().task.id)
+        assertEquals(sport.id, pm.single().task.id)
+    }
+
+    @Test
     fun wallClock_overnight_keepsCivilClips() {
         val sleep = task("sleep", 22 * 60, 6 * 60)
         val am = Reflow.layout(listOf(sleep), DialHalf.AM, ReflowMode.WallClock)

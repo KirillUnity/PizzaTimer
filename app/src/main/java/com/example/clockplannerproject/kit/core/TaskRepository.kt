@@ -23,4 +23,26 @@ interface TaskRepository {
      * Deletes a task by id. No-op if the id is unknown.
      */
     suspend fun delete(taskId: TaskId)
+
+    /**
+     * Single row by id, or null.
+     *
+     * @since 0.4.0
+     */
+    suspend fun get(taskId: TaskId): Task?
+
+    /**
+     * Templates with a non-[RecurrenceRule.None] rule. Used to materialize
+     * the visible day only.
+     *
+     * @since 0.4.0
+     */
+    suspend fun listRecurringTemplates(): List<Task>
+
+    /**
+     * True when this series already has a row on [date] (template or instance).
+     *
+     * @since 0.4.0
+     */
+    suspend fun hasSeriesOnDate(seriesId: String, date: LocalDate): Boolean
 }

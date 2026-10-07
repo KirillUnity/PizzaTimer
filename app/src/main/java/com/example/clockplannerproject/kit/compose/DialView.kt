@@ -130,8 +130,10 @@ fun DialView(
                     },
                     selectedTask = selectedTask,
                     isNearHandle = { offset, task ->
-                        val closed = task.blocks.firstOrNull()?.isClosed(nowMinute.toInt()) == true
-                        if (closed) {
+                        val now = nowMinute.toInt()
+                        val closed = task.blocks.firstOrNull()?.isClosed(now) == true
+                        val running = task.blocks.any { it.isOpen }
+                        if (closed || running) {
                             false
                         } else {
                             val ring = layoutRing(canvasSize, geometry)
@@ -195,6 +197,7 @@ fun DialView(
                         half = half,
                         anchorMinute = anchorMinute,
                         userRotationOffsetDeg = interaction.userRotationOffsetDeg,
+                        selectedTaskId = selectedTask?.id,
                     )
                     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         textSize = (ring.thickness * geometry.labelFontFractionOfThickness)
@@ -212,7 +215,9 @@ fun DialView(
                         geometry,
                         interaction.userRotationOffsetDeg,
                     )
-                    val handleDeg = selectedTask?.takeIf { interaction.resizeEnabled }?.let { task ->
+                    val handleDeg = selectedTask
+                        ?.takeIf { interaction.resizeEnabled && it.blocks.none { block -> block.isOpen } }
+                        ?.let { task ->
                         visualSliceEndDeg(
                             task = task,
                             half = half,

@@ -65,6 +65,39 @@ class RoomTaskRepositoryTest {
     }
 
     @Test
+    fun moveToDate_leavesSourceEmpty() = runTest {
+        val dao = InMemoryTaskDao()
+        val repository = RoomTaskRepository(dao, Dispatchers.Unconfined)
+        val source = LocalDate(2026, 10, 6)
+        val dest = LocalDate(2026, 10, 7)
+        val task = sample(source)
+        repository.upsert(task)
+        repository.upsert(task.copy(date = dest))
+        assertTrue(repository.observeTasks(source).first().isEmpty())
+        val moved = repository.observeTasks(dest).first().single()
+        assertEquals(task.id, moved.id)
+        assertEquals(task.blocks, moved.blocks)
+        assertEquals(task.tags, moved.tags)
+    }
+
+    @Test
+    fun duplicate_twoIndependentIds() = runTest {
+        val dao = InMemoryTaskDao()
+        val repository = RoomTaskRepository(dao, Dispatchers.Unconfined)
+        val date = LocalDate(2026, 10, 6)
+        val original = sample(date)
+        val copy = original.copy(id = TaskId("task-2"), title = "Copy")
+        repository.upsert(original)
+        repository.upsert(copy)
+        val list = repository.observeTasks(date).first()
+        assertEquals(2, list.size)
+        repository.upsert(copy.copy(title = "Edited copy"))
+        val again = repository.observeTasks(date).first().associateBy { it.id }
+        assertEquals("Focus", again[original.id]?.title)
+        assertEquals("Edited copy", again[copy.id]?.title)
+    }
+
+    @Test
     fun upsert_untimedTask_roundTripsEmptyBlocks() = runTest {
         val dao = InMemoryTaskDao()
         val repository = RoomTaskRepository(dao, Dispatchers.Unconfined)
@@ -124,4 +157,19 @@ private class InMemoryTaskDao : TaskDao {
         tasks.update { current -> current.filterNot { it.id == id } }
         blocks.update { current -> current.filterNot { it.taskId == id } }
     }
+
+    override suspend fun getById(id: String): TaskWithBlocks? {
+        val entity = tasks.value.find { it.id == id } ?: return null
+        return TaskWithBlocks(entity, blocks.value.filter { it.taskId == id })
+    }
+
+    override suspend fun listRecurring(): List<TaskWithBlocks> =
+        tasks.value.filter { it.recurrenceKind != "NONE" }.map { entity ->
+            TaskWithBlocks(entity, blocks.value.filter { it.taskId == entity.id })
+        }
+
+    override suspend fun countSeriesOnDate(seriesId: String, dateIso: String): Int =
+        tasks.value.count { row ->
+            row.dateIso == dateIso && (row.seriesId == seriesId || row.id == seriesId)
+        }
 }
