@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Domine:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "error": "#ba1a1a", "on-tertiary-fixed-variant": "#00522f", "surface-dim": "#ded9d4", "secondary-fixed-dim": "#d2c4b7", "on-secondary": "#ffffff", "on-tertiary": "#ffffff", "secondary-fixed": "#efe0d3", "on-primary-fixed": "#3f0300", "surface-container-highest": "#e6e2dd", "on-secondary-fixed": "#221a12", "primary-fixed-dim": "#ffb4a6", "surface-tint": "#af301d", "primary-fixed": "#ffdad4", "secondary": "#675d52", "on-secondary-container": "#6b6156", "surface-container": "#f2ede8", "primary": "#ab2d1b", "surface-container-lowest": "#ffffff", "inverse-primary": "#ffb4a6", "tertiary": "#146940", "primary-container": "#cd4630", "inverse-surface": "#32302d", "surface-bright": "#fdf9f3", "on-primary-fixed-variant": "#8d1607", "outline-variant": "#e1bfb9", "on-error": "#ffffff", "tertiary-fixed": "#a4f4bf", "on-surface-variant": "#59413d", "surface": "#fdf9f3", "background": "#fdf9f3", "surface-container-high": "#ece7e2", "secondary-container": "#ecddd0", "on-primary": "#ffffff", "on-primary-container": "#fffbff", "surface-variant": "#e6e2dd", "tertiary-container": "#348357", "inverse-on-surface": "#f5f0eb", "on-error-container": "#93000a", "on-tertiary-fixed": "#002110", "surface-container-low": "#f8f3ed", "error-container": "#ffdad6", "on-background": "#1c1b18", "tertiary-fixed-dim": "#88d7a5", "on-tertiary-container": "#f6fff5", "outline": "#8d706b", "on-surface": "#1c1b18", "on-secondary-fixed-variant": "#4f453c" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter-expanded": "1.5rem", "space-md": "1rem", "margin-expanded": "2rem", "space-lg": "1.5rem", "space-xl": "2rem", "space-sm": "0.5rem", "margin-compact": "1rem", "space-xs": "0.25rem", "margin": "1rem", "gutter-compact": "0.5rem", "gutter": "1rem" }, "fontFamily": { "headline-dial-numeral-mobile": ["Domine"], "headline-dial-numeral": ["Domine"], "label-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "headline-lg": ["Domine"], "headline-sm": ["Domine"], "display-lg": ["Domine"], "body-lg": ["Plus Jakarta Sans"], "title-lg": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "title-sm": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "display-md": ["Domine"], "title-md": ["Plus Jakarta Sans"], "headline-md": ["Domine"] }, "fontSize": { "headline-dial-numeral-mobile": ["16px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "700" }], "headline-dial-numeral": ["22px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "700" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-sm": ["20px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "display-lg": ["56px", { "lineHeight": "64px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "400" }], "title-lg": ["22px", { "lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "400" }], "title-sm": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "400" }], "display-md": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "title-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-md": ["26px", { "lineHeight": "32px", "letterSpacing": "0em", "fontWeight": "600" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(28,27,24,0.04)] pt-safe"><div class="h-16 px-margin-compact flex items-center justify-between"><div class="flex items-center gap-space-xs"><button aria-label="Previous day" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button><div class="flex flex-col"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">Day</h1><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary mt-space-xs">Horology Meridian · 24H</span></div><button aria-label="Next day" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button></div><div class="flex items-center gap-space-xs"><button aria-label="Calendar jump" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[22px]">calendar_today</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- Top Auxiliary Controls Bar -->
+<div class="px-margin-compact pt-space-sm flex flex-col gap-space-sm">
+<!-- Row 1: Time Meridian & Utility Action Pills -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs bg-surface-container-high px-space-md py-space-xs rounded-full shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-headline-dial-numeral-mobile text-headline-dial-numeral-mobile text-on-surface">10:42</span>
+<span class="font-label-sm text-label-sm uppercase text-secondary tracking-widest pl-1">AM</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<!-- Hide Done Switch -->
+<button aria-label="Toggle Hide Done" class="flex items-center gap-space-xs bg-surface-container-low px-space-sm py-1 rounded-full text-secondary hover:text-on-surface transition-all" id="hide-done-btn">
+<span class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Hide Done</span>
+</button>
+<!-- Reset Rotation -->
+<button aria-label="Reset rotation to zenith" class="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">lock_reset</span>
+</button>
+</div>
+</div>
+<!-- Row 2: Meridian & View Mode Segmented Selectors -->
+<div class="grid grid-cols-12 gap-space-sm items-center">
+<!-- AM | PM Segmented Pill -->
+<div class="col-span-4 bg-surface-container-low p-space-xs rounded-full flex items-center shadow-sm">
+<button class="flex-1 py-1 rounded-full bg-surface-bright text-primary font-title-sm text-title-sm shadow-sm transition-all text-center">AM</button>
+<button class="flex-1 py-1 rounded-full text-secondary font-title-sm text-title-sm hover:text-on-surface transition-all text-center">PM</button>
+</div>
+<!-- View Mode Segmented Control -->
+<div class="col-span-8 bg-surface-container-low p-space-xs rounded-full flex items-center justify-between shadow-sm">
+<button class="flex-1 py-1 px-space-xs rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center justify-center gap-1 shadow-sm transition-all">
+<span class="material-symbols-outlined text-[14px]">motion_photos_on</span>
+<span>Dial</span>
+</button>
+<button class="flex-1 py-1 px-space-xs rounded-full text-secondary font-label-md text-label-md hover:text-on-surface flex items-center justify-center transition-all">
+<span>Pizza</span>
+</button>
+<button class="flex-1 py-1 px-space-xs rounded-full text-secondary font-label-md text-label-md hover:text-on-surface flex items-center justify-center transition-all">
+<span>Petals</span>
+</button>
+<button class="flex-1 py-1 px-space-xs rounded-full text-secondary font-label-md text-label-md hover:text-on-surface flex items-center justify-center transition-all">
+<span>List</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Technical Annotation Badge -->
+<div class="px-margin-compact mt-space-sm">
+<div class="bg-secondary-container text-on-secondary-container px-space-sm py-1 rounded-lg flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-xs min-w-0">
+<span class="material-symbols-outlined text-[14px] shrink-0 text-primary">precision_manufacturing</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wide truncate">Dial Mode • Leftovers Dynamic 5:3 • Closed Read-Only</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase bg-surface-bright px-1.5 py-0.5 rounded text-secondary shrink-0 ml-1">Cal. 24H</span>
+</div>
+</div>
+<!-- Horological 12-Hour Canvas -->
+<div class="relative w-full flex flex-col items-center justify-center pt-space-xs px-margin-compact">
+<!-- SVG Instrument Dial Container -->
+<div class="relative w-full max-w-[340px] aspect-square flex items-center justify-center select-none">
+<!-- Ambient Glow Behind Dial -->
+<div class="absolute inset-4 rounded-full bg-secondary-fixed/40 filter blur-xl -z-10"></div>
+<!-- Main Chrono SVG -->
+<svg class="w-full h-full drop-shadow-md overflow-visible" viewbox="0 0 400 400">
+<defs>
+<!-- Paper Texture Filter & Inset Shadows -->
+<radialgradient cx="50%" cy="50%" id="hubGradient" r="50%">
+<stop offset="0%" stop-color="#FDF9F3"></stop>
+<stop offset="70%" stop-color="#F8F3ED"></stop>
+<stop offset="100%" stop-color="#ECE7E2"></stop>
+</radialgradient>
+<filter height="140%" id="needleShadow" width="140%" x="-20%" y="-20%">
+<fedropshadow dx="0" dy="2" flood-color="#AB2D1B" flood-opacity="0.45" stddeviation="3"></fedropshadow>
+</filter>
+</defs>
+<!-- Dial Outer Baseline Recess -->
+<circle cx="200" cy="200" fill="#ECE7E2" opacity="0.6" r="172"></circle>
+<circle cx="200" cy="200" fill="#FDF9F3" r="108"></circle>
+<!-- 
+          THICK DONUT SECTORS (Center 200,200 | R_out=170, R_in=110, Mid=140, stroke-width=60)
+          Circumference at R=140 is 2*PI*140 = 879.646.
+          12 Hours = 879.646 total arc. 
+          1 Hour = 73.304 units (30 deg). 
+          1 Minute = 1.2217 units (0.5 deg).
+        -->
+<!-- SECTOR 5A: Rest & Sleep (00:00 - 04:00) | 4 hrs = 120 deg | length: 293.22 | start: 0 deg (12 o'clock) -->
+<!-- stroke-dasharray: [length] [remainder] -->
+<circle cx="200" cy="200" fill="none" r="140" stroke="#EADBCE" stroke-dasharray="293.22 586.43" stroke-dashoffset="0" stroke-width="58" transform="rotate(-90 200 200)"></circle>
+<!-- SECTOR 4: Untimed Leftover "Admin & Email" (04:00 - 07:00) | 3 hrs = 90 deg | length: 219.91 | start: 120 deg -->
+<circle cx="200" cy="200" fill="none" r="140" stroke="#348357" stroke-dasharray="219.91 659.74" stroke-dashoffset="-293.22" stroke-width="58" transform="rotate(-90 200 200)"></circle>
+<!-- SECTOR 1: Morning Walk & Coffee [DONE] (07:00 - 08:30) | 1.5 hrs = 45 deg | length: 109.95 | start: 210 deg (offset 513.13) -->
+<circle class="transition-opacity duration-300" cx="200" cy="200" fill="none" id="done-sector" r="140" stroke="#8E8B82" stroke-dasharray="109.95 769.70" stroke-dashoffset="-513.13" stroke-width="58" transform="rotate(-90 200 200)"></circle>
+<!-- SECTOR 2: Deep Work: Engine Architecture [ACTIVE] (08:30 - 10:30) | 2 hrs = 60 deg | length: 146.61 | start: 255 deg (offset 623.08) -->
+<circle cx="200" cy="200" fill="none" r="140" stroke="#2563EB" stroke-dasharray="146.61 733.04" stroke-dashoffset="-623.08" stroke-width="58" transform="rotate(-90 200 200)"></circle>
+<!-- SECTOR 3: Untimed Leftover "Design System Polish" (10:30 - 12:00) | 1.5 hrs = 45 deg | length: 109.95 | start: 315 deg (offset 769.69) -->
+<circle cx="200" cy="200" fill="none" r="140" stroke="#E59819" stroke-dasharray="109.95 769.70" stroke-dashoffset="-769.69" stroke-width="58" transform="rotate(-90 200 200)"></circle>
+<!-- Radial Sector Seam Dividers (Chrono engraved notches) -->
+<!-- 00:00 / 12:00 -->
+<line stroke="#FDF9F3" stroke-width="2" x1="200" x2="200" y1="30" y2="90"></line>
+<!-- 04:00 (120 deg) -->
+<line stroke="#FDF9F3" stroke-dasharray="60" stroke-dashoffset="-110" stroke-width="2" x1="200" x2="347" y1="200" y2="285"></line>
+<!-- 07:00 (210 deg) -->
+<line stroke="#FDF9F3" stroke-dasharray="60" stroke-dashoffset="-110" stroke-width="2" x1="200" x2="53" y1="200" y2="285"></line>
+<!-- 08:30 (255 deg) -->
+<line stroke="#FDF9F3" stroke-dasharray="60" stroke-dashoffset="-110" stroke-width="2" x1="200" x2="36" y1="200" y2="244"></line>
+<!-- 10:30 (315 deg) -->
+<line stroke="#FDF9F3" stroke-dasharray="60" stroke-dashoffset="-110" stroke-width="2" x1="200" x2="80" y1="200" y2="80"></line>
+<!-- Minute & Hour Dial Marks (Subdivisions) -->
+<!-- Major 12-hour Ticks along inner rim R=110 -->
+<g stroke="#1C1B18" stroke-opacity="0.25" stroke-width="1.5">
+<!-- 12 Ticks -->
+<line x1="200" x2="200" y1="92" y2="99"></line>
+<line x1="254" x2="250" y1="106" y2="113"></line>
+<line x1="294" x2="287" y1="146" y2="150"></line>
+<line x1="308" x2="301" y1="200" y2="200"></line>
+<line x1="294" x2="287" y1="254" y2="250"></line>
+<line x1="254" x2="250" y1="294" y2="287"></line>
+<line x1="200" x2="200" y1="308" y2="301"></line>
+<line x1="146" x2="150" y1="294" y2="287"></line>
+<line x1="106" x2="113" y1="254" y2="250"></line>
+<line x1="92" x2="99" y1="200" y2="200"></line>
+<line x1="106" x2="113" y1="146" y2="150"></line>
+<line x1="146" x2="150" y1="106" y2="113"></line>
+</g>
+<!-- Chronograph Hour Digits along the Mid-Radius (R=140) -->
+<!-- Rendered in crisp, contrast-aware tones -->
+<g class="font-headline-dial-numeral-mobile text-[13px] font-bold select-none" dominant-baseline="central" text-anchor="middle">
+<!-- 12 o'clock -->
+<text fill="#1C1B18" fill-opacity="0.8" x="200" y="140">12</text>
+<!-- 1 o'clock -->
+<text fill="#1C1B18" fill-opacity="0.8" x="270" y="159">1</text>
+<!-- 2 o'clock -->
+<text fill="#1C1B18" fill-opacity="0.8" x="321" y="210">2</text>
+<!-- 3 o'clock -->
+<text fill="#1C1B18" fill-opacity="0.8" x="340" y="270">3</text>
+<!-- 4 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="321" y="329">4</text>
+<!-- 5 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="270" y="380">5</text>
+<!-- 6 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="200" y="398">6</text>
+<!-- 7 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="130" y="380">7</text>
+<!-- 8 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="79" y="329">8</text>
+<!-- 9 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="60" y="270">9</text>
+<!-- 10 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="79" y="210">10</text>
+<!-- 11 o'clock -->
+<text fill="#FFFFFF" fill-opacity="0.95" x="130" y="159">11</text>
+</g>
+<!-- Done Sector Badge (07:00-08:30) -->
+<g id="done-sector-badge" transform="translate(100, 310)">
+<circle cx="0" cy="0" fill="#FFFFFF" opacity="0.9" r="10"></circle>
+<path d="M-4 -0.5 L-1.5 2 L4 -3.5" fill="none" stroke="#1C1B18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</g>
+<!-- Active Sector Glow Pulse Indicator (Cobalt sector at 09:30 angle) -->
+<circle class="animate-ping" cx="106" cy="200" fill="#FFFFFF" opacity="0.9" r="4"></circle>
+<circle cx="106" cy="200" fill="#FFFFFF" r="3"></circle>
+<!-- 
+          "NOW" MARKER: 10:42 AM
+          Angle calculation: 
+          10 hours = 10 * 30 = 300 deg.
+          42 mins = 42 * 0.5 = 21 deg.
+          Total = 321 deg from top clockwise (-90 in SVG polar coordinates = 231 deg).
+        -->
+<g filter="url(#needleShadow)" transform="rotate(321 200 200)">
+<!-- Needle Arrow Head anchored at outer bezel -->
+<polygon fill="#AB2D1B" points="200,18 193,34 207,34"></polygon>
+<!-- Fine chronometer pointer reaching into the track -->
+<line stroke="#AB2D1B" stroke-linecap="round" stroke-width="3" x1="200" x2="200" y1="34" y2="108"></line>
+<circle cx="200" cy="108" fill="#AB2D1B" r="3"></circle>
+</g>
+<!-- Central Dial Hub (Recessed Paper Escapement) -->
+<circle cx="200" cy="200" fill="url(#hubGradient)" r="105" stroke="#ECE7E2" stroke-width="2"></circle>
+<circle cx="200" cy="200" fill="#FDF9F3" r="94"></circle>
+</svg>
+<!-- Center Hole UI Content (Horological Hub Readout) -->
+<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6 text-center">
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-primary font-bold mb-0.5">Live Chrono</span>
+<div class="font-headline-lg text-headline-lg text-on-surface tracking-tight leading-none">10:42</div>
+<div class="flex items-center gap-1 mt-1 bg-surface-container-high px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[13px] text-tertiary">hourglass_bottom</span>
+<span class="font-label-sm text-label-sm uppercase text-secondary tracking-wider">Remaining 18m</span>
+</div>
+<p class="font-label-sm text-label-sm text-secondary-container-variant text-secondary mt-2 line-clamp-1">Tap task block to adjust</p>
+</div>
+</div>
+</div>
+<!-- Sector Legends & Task Cards Container -->
+<div class="px-margin-compact mt-space-sm flex flex-col gap-space-sm">
+<!-- Active In-Progress Banner Card -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex items-center justify-between transition-transform active:scale-[0.99]">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-2.5 h-10 rounded-full bg-[#2563EB] shrink-0"></div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-[#2563EB] font-bold">Active Segment</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#2563EB] animate-ping"></span>
+</div>
+<h2 class="font-title-md text-title-md text-on-surface truncate">Deep Work: Engine Architecture</h2>
+<span class="font-body-sm text-body-sm text-secondary">08:30 – 10:30 • Focus Session</span>
+</div>
+</div>
+<button class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0 active:bg-primary active:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-[22px]">pause</span>
+</button>
+</div>
+<!-- Untimed Allocations Breakdown Card (Leftover 5:3 Share) -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Leftover Dynamic Share (5 : 3)</span>
+<span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-2 py-0.5 rounded-full">Weight 8 total</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs pt-1">
+<!-- Task 1: Ochre -->
+<div class="bg-surface-bright p-space-sm rounded-lg flex flex-col justify-between">
+<div class="flex items-center gap-1.5 mb-1">
+<span class="w-2 h-2 rounded-full bg-[#E59819]"></span>
+<span class="font-label-sm text-label-sm uppercase font-bold text-[#8d5c07]">Share 62.5%</span>
+</div>
+<span class="font-title-sm text-title-sm text-on-surface truncate">Design System</span>
+<span class="font-body-sm text-body-sm text-secondary">10:30–12:00 • W5 High</span>
+</div>
+<!-- Task 2: Emerald -->
+<div class="bg-surface-bright p-space-sm rounded-lg flex flex-col justify-between">
+<div class="flex items-center gap-1.5 mb-1">
+<span class="w-2 h-2 rounded-full bg-[#2E7D52]"></span>
+<span class="font-label-sm text-label-sm uppercase font-bold text-[#146940]">Share 37.5%</span>
+</div>
+<span class="font-title-sm text-title-sm text-on-surface truncate">Admin &amp; Email</span>
+<span class="font-body-sm text-body-sm text-secondary">04:00–07:00 • W3 Med</span>
+</div>
+</div>
+</div>
+<!-- Completed & Rest Slices Horizontal Feed -->
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Completed Immutable -->
+<div class="bg-surface-container-low p-space-sm rounded-xl flex items-center gap-space-sm shadow-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-secondary">done_all</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-title-sm text-title-sm text-on-surface truncate">Morning Walk</span>
+<span class="font-label-sm text-label-sm text-secondary">07:00–08:30 • Done</span>
+</div>
+</div>
+<!-- Rest Allocation -->
+<div class="bg-surface-container-low p-space-sm rounded-xl flex items-center gap-space-sm shadow-sm">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-on-secondary-fixed">bedtime</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-title-sm text-title-sm text-on-surface truncate">Rest &amp; Sleep</span>
+<span class="font-label-sm text-label-sm text-secondary">00:00–07:00 • 7h</span>
+</div>
+</div>
+</div>
+<!-- Primary Horology Action -->
+<div class="pt-space-xs pb-space-sm">
+<button class="w-full h-12 bg-primary text-on-primary rounded-lg font-title-sm text-title-sm flex items-center justify-center gap-space-xs shadow-md active:bg-primary-container transition-all">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span>Log New Chrono Sector</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+  // Hide Done Toggle micro-interaction
+  const hideDoneBtn = document.getElementById('hide-done-btn');
+  const doneSector = document.getElementById('done-sector');
+  const doneBadge = document.getElementById('done-sector-badge');
+  let isDoneHidden = false;
+
+  if (hideDoneBtn && doneSector && doneBadge) {
+    hideDoneBtn.addEventListener('click', () => {
+      isDoneHidden = !isDoneHidden;
+      if (isDoneHidden) {
+        doneSector.style.opacity = '0.15';
+        doneBadge.style.opacity = '0';
+        hideDoneBtn.classList.add('bg-secondary-fixed');
+      } else {
+        doneSector.style.opacity = '1';
+        doneBadge.style.opacity = '1';
+        hideDoneBtn.classList.remove('bg-secondary-fixed');
+      }
+    });
+  }
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(28,27,24,0.05)]" data-active-classes="text-primary font-bold"><div class="flex justify-around items-center h-16 px-space-sm"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[64px] h-12 transition-colors gap-space-xs text-primary font-bold" data-path="day" href="#"><span class="material-symbols-outlined text-[24px]">schedule</span><span class="font-label-md text-label-md leading-none">Day</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="tasks" href="#"><span class="material-symbols-outlined text-[24px]">checklist</span><span class="font-label-md text-label-md leading-none">Tasks</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="reports" href="#"><span class="material-symbols-outlined text-[24px]">analytics</span><span class="font-label-md text-label-md leading-none">Reports</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="settings" href="#"><span class="material-symbols-outlined text-[24px]">settings</span><span class="font-label-md text-label-md leading-none">Settings</span></a></div></nav></body></html>

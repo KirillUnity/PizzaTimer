@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Domine:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "error": "#ba1a1a", "on-tertiary-fixed-variant": "#00522f", "surface-dim": "#ded9d4", "secondary-fixed-dim": "#d2c4b7", "on-secondary": "#ffffff", "on-tertiary": "#ffffff", "secondary-fixed": "#efe0d3", "on-primary-fixed": "#3f0300", "surface-container-highest": "#e6e2dd", "on-secondary-fixed": "#221a12", "primary-fixed-dim": "#ffb4a6", "surface-tint": "#af301d", "primary-fixed": "#ffdad4", "secondary": "#675d52", "on-secondary-container": "#6b6156", "surface-container": "#f2ede8", "primary": "#ab2d1b", "surface-container-lowest": "#ffffff", "inverse-primary": "#ffb4a6", "tertiary": "#146940", "primary-container": "#cd4630", "inverse-surface": "#32302d", "surface-bright": "#fdf9f3", "on-primary-fixed-variant": "#8d1607", "outline-variant": "#e1bfb9", "on-error": "#ffffff", "tertiary-fixed": "#a4f4bf", "on-surface-variant": "#59413d", "surface": "#fdf9f3", "background": "#fdf9f3", "surface-container-high": "#ece7e2", "secondary-container": "#ecddd0", "on-primary": "#ffffff", "on-primary-container": "#fffbff", "surface-variant": "#e6e2dd", "tertiary-container": "#348357", "inverse-on-surface": "#f5f0eb", "on-error-container": "#93000a", "on-tertiary-fixed": "#002110", "surface-container-low": "#f8f3ed", "error-container": "#ffdad6", "on-background": "#1c1b18", "tertiary-fixed-dim": "#88d7a5", "on-tertiary-container": "#f6fff5", "outline": "#8d706b", "on-surface": "#1c1b18", "on-secondary-fixed-variant": "#4f453c" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter-expanded": "1.5rem", "space-md": "1rem", "margin-expanded": "2rem", "space-lg": "1.5rem", "space-xl": "2rem", "space-sm": "0.5rem", "margin-compact": "1rem", "space-xs": "0.25rem", "margin": "1rem", "gutter-compact": "0.5rem", "gutter": "1rem" }, "fontFamily": { "headline-dial-numeral-mobile": ["Domine"], "headline-dial-numeral": ["Domine"], "label-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "headline-lg": ["Domine"], "headline-sm": ["Domine"], "display-lg": ["Domine"], "body-lg": ["Plus Jakarta Sans"], "title-lg": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "title-sm": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "display-md": ["Domine"], "title-md": ["Plus Jakarta Sans"], "headline-md": ["Domine"] }, "fontSize": { "headline-dial-numeral-mobile": ["16px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "700" }], "headline-dial-numeral": ["22px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "700" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-sm": ["20px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "display-lg": ["56px", { "lineHeight": "64px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "400" }], "title-lg": ["22px", { "lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "400" }], "title-sm": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "400" }], "display-md": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "title-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-md": ["26px", { "lineHeight": "32px", "letterSpacing": "0em", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(28,27,24,0.04)] pt-safe"><div class="h-16 px-margin-compact flex items-center justify-between"><div class="flex items-center gap-space-xs"><button aria-label="Previous day" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button><div class="flex flex-col"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">Day</h1><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary mt-space-xs">Horology Meridian · 24H</span></div><button aria-label="Next day" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button></div><div class="flex items-center gap-space-xs"><button aria-label="Calendar jump" class="w-11 h-11 flex items-center justify-center rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[22px]">calendar_today</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full px-margin-compact space-y-space-md pb-6">
+<!-- Sub-header & Mode Selectors -->
+<div class="flex flex-col w-full space-y-space-sm pt-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-baseline space-x-space-xs">
+<span class="font-headline-md text-headline-md text-on-surface">Thu, Oct 24</span>
+<span class="font-label-md text-label-md text-secondary">· 01:15 PM</span>
+</div>
+<div class="flex items-center space-x-1 bg-surface-container-low px-2 py-1 rounded-full shadow-sm">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Hide Done</span>
+<div class="w-4 h-4 rounded-full bg-surface-container-high flex items-center justify-center">
+<span class="material-symbols-outlined text-[12px] text-secondary">visibility_off</span>
+</div>
+</div>
+</div>
+<!-- Segmented Navigation Chips -->
+<div class="flex items-center justify-between bg-surface-container-low p-1 rounded-xl shadow-sm">
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md text-secondary hover:text-on-surface transition-colors rounded-lg">Dial</button>
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md bg-primary text-on-primary rounded-lg shadow-sm font-semibold flex items-center justify-center space-x-1">
+<span class="material-symbols-outlined text-[16px]">pie_chart</span>
+<span>Pizza</span>
+</button>
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md text-secondary hover:text-on-surface transition-colors rounded-lg">Petals</button>
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md text-secondary hover:text-on-surface transition-colors rounded-lg">List</button>
+</div>
+<!-- AM / PM Indicator Pill -->
+<div class="flex items-center justify-between px-space-xs">
+<div class="flex items-center space-x-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant font-bold">12H PM Cycle · Meridiem View</span>
+</div>
+<div class="flex bg-surface-container rounded-lg p-0.5 text-secondary font-label-sm text-label-sm">
+<span class="px-2 py-0.5 text-secondary">AM</span>
+<span class="px-2 py-0.5 bg-surface-bright text-primary font-bold rounded-md shadow-xs">PM</span>
+</div>
+</div>
+</div>
+<!-- HERO PIZZA CHRONO DIAL -->
+<div class="relative w-full aspect-square max-w-[360px] mx-auto flex items-center justify-center select-none py-2">
+<!-- Base Watch Dial SVG with Solid Pizza Slices -->
+<svg class="w-full h-full drop-shadow-md" viewbox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<!-- Sand Crosshatch for Rest/Sleep -->
+<pattern height="8" id="hatch-sand" patterntransform="rotate(45 0 0)" patternunits="userSpaceOnUse" width="8">
+<line stroke="#D2C4B7" stroke-width="2" x1="0" x2="0" y1="0" y2="8"></line>
+</pattern>
+<!-- Soft Inner Gradient for Aperture Center -->
+<radialgradient cx="50%" cy="50%" id="aperture-glow" r="50%">
+<stop offset="70%" stop-color="#FDF9F3"></stop>
+<stop offset="100%" stop-color="#ECE7E2"></stop>
+</radialgradient>
+</defs>
+<!-- Background Bezel Dial Rim -->
+<circle cx="200" cy="200" fill="#F2EDE8" r="192" stroke="#E6E2DD" stroke-width="2"></circle>
+<circle cx="200" cy="200" fill="#F8F3ED" r="186"></circle>
+<!-- PIZZA SECTORS (Outer r=186, Center Cutout r=75) -->
+<!-- 12-hour layout: Each hour = 30 degrees. 12:00 = 0° (top). Angles clockwise. -->
+<!-- 1) 12:00 to 01:00 (0° to 30°) : "Sport" Sector 2 [Solid Coral / Terracotta] -->
+<!-- Radius: 186, Inner: 75. 0° -> (200, 14), 30° -> (293, 38.89), inner 30° -> (237.5, 135.05), inner 0° -> (200, 125) -->
+<path d="M 200 14 
+               A 186 186 0 0 1 293 38.9
+               L 237.5 135.1
+               A 75 75 0 0 0 200 125 Z" fill="#CD4630"></path>
+<!-- 2) 01:00 to 03:00 (30° to 90°) : Leftover Unallocated Sand Slice -->
+<path d="M 293 38.9 
+               A 186 186 0 0 1 386 200
+               L 275 200
+               A 75 75 0 0 0 237.5 135.1 Z" fill="#EFE0D3" opacity="0.9"></path>
+<!-- 3) 03:00 to 05:00 (90° to 150°) : Sleep & Recharge Rest Sector (Sand Hatched) -->
+<path d="M 386 200 
+               A 186 186 0 0 1 293 361.1
+               L 237.5 264.9
+               A 75 75 0 0 0 275 200 Z" fill="url(#hatch-sand)"></path>
+<!-- 4) 05:00 to 08:00 (150° to 240°) : Unallocated Calm Afternoon Sand -->
+<path d="M 293 361.1 
+               A 186 186 0 0 1 38.9 293
+               L 135.1 237.5
+               A 75 75 0 0 0 237.5 264.9 Z" fill="#EADDCE" opacity="0.85"></path>
+<!-- 5) 08:00 to 09:00 (240° to 270°) : "Sport" Sector 1 [Identical Coral / Terracotta] -->
+<!-- 240° to 270° (Left side quadrant) -->
+<path d="M 38.9 293 
+               A 186 186 0 0 1 14 200
+               L 125 200
+               A 75 75 0 0 0 135.1 237.5 Z" fill="#CD4630"></path>
+<!-- 6) 09:30 to 11:30 (285° to 345°) : "Deep Work" Sector [Saturated Ink Cobalt/Charcoal] -->
+<path d="M 20.2 151.9 
+               A 186 186 0 0 1 151.9 20.2
+               L 180.6 127.5
+               A 75 75 0 0 0 127.5 180.6 Z" fill="#32302D"></path>
+<!-- 7) 11:30 to 12:00 (345° to 360°) : Unallocated Quick Pause Transition -->
+<path d="M 151.9 20.2 
+               A 186 186 0 0 1 200 14
+               L 200 125
+               A 75 75 0 0 0 180.6 127.5 Z" fill="#EFE0D3"></path>
+<!-- 12 Engraved Radial Hour Dividing Grooves -->
+<g opacity="0.9" stroke="#FAF6EE" stroke-width="2.5">
+<line x1="200" x2="200" y1="14" y2="125"></line>
+<line x1="293" x2="237.5" y1="38.9" y2="135.1"></line>
+<line x1="361.1" x2="264.9" y1="107" y2="162.5"></line>
+<line x1="386" x2="275" y1="200" y2="200"></line>
+<line x1="361.1" x2="264.9" y1="293" y2="237.5"></line>
+<line x1="293" x2="237.5" y1="361.1" y2="264.9"></line>
+<line x1="200" x2="200" y1="386" y2="275"></line>
+<line x1="107" x2="162.5" y1="361.1" y2="264.9"></line>
+<line x1="38.9" x2="135.1" y1="293" y2="237.5"></line>
+<line x1="14" x2="125" y1="200" y2="200"></line>
+<line x1="38.9" x2="135.1" y1="107" y2="162.5"></line>
+<line x1="107" x2="162.5" y1="38.9" y2="135.1"></line>
+</g>
+<!-- Outer Chrono Ticks (Minute Markers) -->
+<g opacity="0.4" stroke="#8D706B" stroke-width="1.5">
+<!-- 12-hour cardinal numbers -->
+<text fill="#32302D" font-family="Domine" font-size="12" font-weight="700" text-anchor="middle" x="200" y="32">12</text>
+<text fill="#32302D" font-family="Domine" font-size="12" font-weight="700" text-anchor="middle" x="368" y="204">3</text>
+<text fill="#32302D" font-family="Domine" font-size="12" font-weight="700" text-anchor="middle" x="200" y="376">6</text>
+<text fill="#32302D" font-family="Domine" font-size="12" font-weight="700" text-anchor="middle" x="32" y="204">9</text>
+</g>
+<!-- Label inside 08:00–09:00 Sport wedge -->
+<text fill="#FFF" font-family="Plus Jakarta Sans" font-size="10" font-weight="700" transform="rotate(-45 76 255)" x="76" y="255">SPORT 8-9</text>
+<!-- Label inside Deep Work wedge -->
+<text fill="#E6E2DD" font-family="Plus Jakarta Sans" font-size="9" font-weight="600" transform="rotate(45 96 96)" x="96" y="96">WORK 9:30-11:30</text>
+<!-- Real-Time Terracotta Meridian Needle pointing at ~01:15 (37.5 degrees) -->
+<line stroke="#AB2D1B" stroke-linecap="round" stroke-width="3" x1="200" x2="310" y1="200" y2="116"></line>
+<circle cx="310" cy="116" fill="#CD4630" r="4.5" stroke="#FDF9F3" stroke-width="1.5"></circle>
+<!-- Center Aperture Cutout -->
+<circle cx="200" cy="200" fill="url(#aperture-glow)" r="76" stroke="#ECE7E2" stroke-width="3"></circle>
+<circle cx="200" cy="200" fill="#FDF9F3" r="72"></circle>
+</svg>
+<!-- Anchored Speech Bubble Callout: Pointed right at 12:00-13:00 Sport Wedge -->
+<div class="absolute -top-1 right-2 sm:right-6 bg-inverse-surface text-inverse-on-surface px-3 py-2 rounded-xl shadow-lg flex items-center space-x-2 z-20 pointer-events-none transform -translate-y-2 animate-bounce">
+<div class="w-2.5 h-2.5 rounded-full bg-primary-fixed-dim"></div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold tracking-tight text-primary-fixed uppercase">Active Wedge</span>
+<span class="font-title-sm text-title-sm font-bold text-surface-bright leading-none">Sport 12:00–13:00</span>
+</div>
+<!-- Tiny pointer arrow downward -->
+<div class="absolute -bottom-1.5 left-5 w-3 h-3 bg-inverse-surface transform rotate-45"></div>
+</div>
+<!-- CENTER HOLE: Interactive Aperture (Aperture Status & Start CTA) -->
+<div class="absolute inset-0 m-auto w-[138px] h-[138px] rounded-full flex flex-col items-center justify-center p-2 text-center pointer-events-auto">
+<span class="font-label-sm text-label-sm uppercase font-bold text-secondary tracking-widest mt-1">Horology</span>
+<div class="font-headline-dial-numeral-mobile text-headline-dial-numeral-mobile text-on-surface font-headline-lg font-bold -my-0.5">
+        2h 00m
+      </div>
+<span class="font-label-sm text-label-sm text-primary font-bold">Sport Tracked</span>
+<!-- 48dp Interactive Play/Commit Crown Trigger -->
+<button aria-label="Commit segment timer" class="w-12 h-12 mt-1 rounded-full bg-primary text-on-primary shadow-md flex items-center justify-center active:scale-95 transition-transform hover:bg-primary-container">
+<span class="material-symbols-outlined text-[24px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Radial Wedges Inventory Breakdown Section -->
+<div class="flex flex-col w-full space-y-space-sm pt-space-xs">
+<div class="flex items-center justify-between px-space-xs">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-secondary text-[20px]">calendar_view_day</span>
+<h2 class="font-title-md text-title-md font-bold text-on-surface">Time Blocks Partitioned</h2>
+</div>
+<span class="font-label-md text-label-md text-secondary">3 Categories · 24h Arc</span>
+</div>
+<!-- Task Group Card: SPORT (Showcasing 2 wedges unified under single task) -->
+<div class="w-full bg-surface-container-low rounded-xl p-space-md shadow-xs space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-space-sm">
+<!-- Fountain Pen Color Dip Ink Bar Indicator -->
+<div class="w-2.5 h-7 rounded-full bg-primary"></div>
+<div>
+<div class="flex items-center space-x-2">
+<span class="font-title-md text-title-md font-bold text-on-surface">Sport &amp; Conditioning</span>
+<span class="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">2 Wedges (60°)</span>
+</div>
+<span class="font-body-sm text-body-sm text-secondary">High intensity interval and mid-day recovery</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm font-bold text-primary font-headline-dial-numeral">2h 00m</span>
+</div>
+</div>
+<!-- Nested Distinct Radial Wedges for Sport -->
+<div class="grid grid-cols-1 gap-2 pt-1">
+<!-- Wedge 1: Morning Block -->
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-surface-bright shadow-xs">
+<div class="flex items-center space-x-2.5">
+<div class="w-6 h-6 rounded-md bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[16px]">fitness_center</span>
+</div>
+<div>
+<span class="font-label-lg text-label-lg font-bold text-on-surface">Interval A: Morning Cardio</span>
+<span class="font-body-sm text-body-sm text-secondary block">08:00 AM – 09:00 AM · 30° radial slice</span>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<span class="font-label-md text-label-md font-semibold text-secondary">60 min</span>
+<div class="w-5 h-5 rounded-md bg-on-surface flex items-center justify-center text-surface-bright">
+<span class="material-symbols-outlined text-[14px]">done</span>
+</div>
+</div>
+</div>
+<!-- Wedge 2: Afternoon Block (Appended 12:00-13:00 Block) -->
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-surface-bright shadow-xs">
+<div class="flex items-center space-x-2.5">
+<div class="w-6 h-6 rounded-md bg-primary text-on-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">directions_run</span>
+</div>
+<div>
+<div class="flex items-center space-x-1.5">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">Interval B: Strength Training</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+<span class="font-body-sm text-body-sm text-secondary block">12:00 PM – 01:00 PM · 30° radial slice</span>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<span class="font-label-md text-label-md font-semibold text-primary font-bold">60 min</span>
+<div class="w-5 h-5 rounded-md bg-surface-container-high flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[14px]">refresh</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary Task Card: Deep Work (Cobalt/Charcoal sector) -->
+<div class="w-full bg-surface-container-low rounded-xl p-space-md shadow-xs flex items-center justify-between">
+<div class="flex items-center space-x-space-sm">
+<div class="w-2.5 h-7 rounded-full bg-inverse-surface"></div>
+<div>
+<span class="font-title-md text-title-md font-bold text-on-surface">Deep Work (Writing &amp; Eng)</span>
+<span class="font-body-sm text-body-sm text-secondary block">09:30 AM – 11:30 AM · 60° slice</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface font-headline-dial-numeral">2h 00m</span>
+<span class="font-label-sm text-label-sm text-tertiary block font-bold">Completed</span>
+</div>
+</div>
+<!-- Tertiary Card: Rest & Sleep Sector (Hatched Sand) -->
+<div class="w-full bg-surface-container-low rounded-xl p-space-md shadow-xs flex items-center justify-between">
+<div class="flex items-center space-x-space-sm">
+<div class="w-2.5 h-7 rounded-full bg-secondary-fixed-dim"></div>
+<div>
+<span class="font-title-md text-title-md font-bold text-on-surface">Sleep &amp; Passive Recovery</span>
+<span class="font-body-sm text-body-sm text-secondary block">00:00 – 07:00 AM · 105° slice (Hatched Sand)</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm font-bold text-secondary font-headline-dial-numeral">7h 00m</span>
+<span class="font-label-sm text-label-sm text-secondary block">Archived</span>
+</div>
+</div>
+<!-- Unallocated "Pizza Slices" Buffer Callout -->
+<div class="p-3 bg-secondary-container rounded-xl flex items-center justify-between text-on-secondary-container">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-[20px]">hourglass_empty</span>
+<span class="font-label-md text-label-md font-bold">Unallocated Sand Slices Left:</span>
+</div>
+<span class="font-headline-dial-numeral-mobile text-headline-dial-numeral-mobile font-bold">13h 00m</span>
+</div>
+<!-- Quick Dial Action Bar -->
+<div class="flex items-center space-x-2 pt-2">
+<button class="flex-1 h-12 bg-primary text-on-primary rounded-xl font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 shadow-sm active:bg-primary-container">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span>Append Slice</span>
+</button>
+<button class="w-12 h-12 bg-surface-container-high text-on-surface rounded-xl flex items-center justify-center shadow-xs hover:bg-surface-dim">
+<span class="material-symbols-outlined text-[22px]">tune</span>
+</button>
+</div>
+</div>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(28,27,24,0.05)]" data-active-classes="text-primary font-bold"><div class="flex justify-around items-center h-16 px-space-sm"><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="day" href="#"><span class="material-symbols-outlined text-[24px]">schedule</span><span class="font-label-md text-label-md leading-none">Day</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="tasks" href="#"><span class="material-symbols-outlined text-[24px]">checklist</span><span class="font-label-md text-label-md leading-none">Tasks</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="reports" href="#"><span class="material-symbols-outlined text-[24px]">analytics</span><span class="font-label-md text-label-md leading-none">Reports</span></a><a class="flex flex-col items-center justify-center min-w-[64px] h-12 text-secondary hover:text-on-surface transition-colors gap-space-xs" data-path="settings" href="#"><span class="material-symbols-outlined text-[24px]">settings</span><span class="font-label-md text-label-md leading-none">Settings</span></a></div></nav></body></html>
