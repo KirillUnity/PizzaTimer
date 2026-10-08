@@ -28,10 +28,12 @@ enum class TaskStatus {
  * the task itself. An empty [blocks] list is an **untimed** task (leftover).
  * Several blocks share this [id] and paint as several sectors.
  *
- * @property date local calendar day this instance belongs to.
+ * @property date local calendar day this instance belongs to, or `null` while
+ * the task is in the undated backlog.
  * @property colorArgb packed ARGB color, parsed outside the Canvas draw loop.
  * @property importance leftover weight only; ignored for civil blocks.
- * @property tags free-form labels; not a category catalog.
+ * @property project optional single project. Whitespace is normalized by
+ * [normalizedProject].
  * @property recurrence template rule; materialized copies use [RecurrenceRule.None].
  * @property seriesId shared id for a template and its day instances.
  * @since 0.1.0
@@ -43,12 +45,16 @@ data class Task(
     val colorArgb: Long,
     val blocks: List<TimeBlock> = emptyList(),
     val status: TaskStatus = TaskStatus.TODO,
-    val date: LocalDate,
+    val date: LocalDate?,
     val importance: Importance = Importance.MEDIUM,
-    val tags: List<String> = emptyList(),
+    val project: String? = null,
     val recurrence: RecurrenceRule = RecurrenceRule.None,
     val seriesId: String? = null,
 ) {
+    /** Trimmed project name, or `null` when no project is assigned. */
+    val normalizedProject: String?
+        get() = project?.trim()?.takeIf { it.isNotEmpty() }
+
     /** True when the task has no civil intervals. */
     val isUntimed: Boolean get() = blocks.isEmpty()
 

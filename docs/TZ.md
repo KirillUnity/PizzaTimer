@@ -18,7 +18,7 @@ Product spec: [ROADMAP.md](ROADMAP.md). Daily prompts: [DAILY_PROMPTS.md](DAILY_
 - **TimeBlock** — полуоткрытый интервал `[startMinute, endMinute)` в минутах суток. Пустой список блоков = задача **без времени**. Несколько блоков = несколько секторов с одним `TaskId` (спорт 08:00–09:00 и 12:00–13:00).
 - **Importance** — `HIGH` / `MEDIUM` / `LOW`, веса **5 : 3 : 2**.
 - **Tag** — несколько строк на задачу; не отдельный CRUD категорий на неделе 3.
-- **TaskReport** (неделя 5) — текст + вложения (файлы в app storage, URI в Room). Не облако.
+- **TaskReport** — текст на **неделе 5**; вложения (файлы в app storage, URI в Room) на **неделе 6**. Не облако.
 
 `startMinute`/`endMinute` на корне Task **не** единственный источник истины: углы и длительность считаются по блокам.
 
@@ -75,7 +75,7 @@ KMP, iOS, Google/Apple Calendar, Maven Central, магазины как обяз
 - Tasks may have **zero or many** `TimeBlock`s; one id, many sectors.
 - **Untimed** tasks share each 12h face’s **leftover** (former Rest), weights HIGH:MEDIUM:LOW = **5:3:2** (50/30/20 when all three differ). Equal importance → equal shares. Rest paints only leftover after untimed. Timed tasks stay wall-clock.
 - Past blocks are **immutable**; timer **appends** Start/Pause intervals.
-- Tags on the task; recurrence/move/duplicate in week 4; reports + local media in week 5.
+- Tags on the task; recurrence/move/duplicate in week 4; report **text** in week 5; local media in week 6.
 - **No Room migrations** — destructive version bump; reinstall/wipe until Play-ready.
 - UI must not invent leftover math; use `kit.core.layout`.
 - DIAL/PIZZA/PETALS/LIST already in the app; week 3 does not reimplement pizza from zero.

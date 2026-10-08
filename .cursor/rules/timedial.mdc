@@ -7,7 +7,7 @@ alwaysApply: true
 
 You are implementing **TimeDial**: a day planner drawn as a clock, not a list. This repo is **Android-first** Jetpack Compose (`:app`, `com.example.clockplannerproject`, minSdk 29). Do not start Kotlin Multiplatform, iOS, Hilt, Google Calendar, or extra Gradle modules unless the user explicitly asks.
 
-Follow [AGENTS.md](AGENTS.md), [docs/TZ.md](docs/TZ.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the current day in [docs/DAILY_PROMPTS.md](docs/DAILY_PROMPTS.md).
+Follow [AGENTS.md](AGENTS.md), [docs/TZ.md](docs/TZ.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the current day in [docs/DAILY_PROMPTS.md](docs/DAILY_PROMPTS.md). UI look: `stitch_timedial_planner_ui_kit` (PNG + DESIGN.md), not pixel-perfect; never paste Stitch HTML into `:app`.
 
 ## Stack
 

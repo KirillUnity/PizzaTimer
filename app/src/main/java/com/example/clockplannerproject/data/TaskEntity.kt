@@ -10,8 +10,8 @@ import androidx.room.Relation
 /**
  * Room row for [com.example.clockplannerproject.kit.core.Task].
  *
- * [dateIso] is `YYYY-MM-DD`. [status] and [importance] are enum names.
- * [tagsCsv] uses a unit-separator so tags may contain commas.
+ * [dateIso] is `YYYY-MM-DD`, or `null` for backlog tasks. [status] and
+ * [importance] are enum names. [project] stores at most one normalized project.
  *
  * Civil minutes live in [TimeBlockEntity], not on this row.
  *
@@ -24,9 +24,9 @@ data class TaskEntity(
     val description: String,
     val colorArgb: Long,
     val status: String,
-    val dateIso: String,
+    val dateIso: String?,
     val importance: String,
-    val tagsCsv: String,
+    val project: String?,
     val recurrenceKind: String = "NONE",
     val weekdaysMask: Int = 0,
     val seriesId: String? = null,

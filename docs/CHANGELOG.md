@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.0 — 2026-10-08
+
+Week 5: Horological Paper Craft + thin text reports.
+
+### Added
+- Paper theme tokens (canvas `#FBF9F5` / `#fdf9f3`, ink `#1C1B18`, terracotta now `#E0533C`, sand Rest, DONE `#8E8B82`)
+- Bundled **Domine** + **Plus Jakarta Sans** in `res/font` (OFL, google/fonts; see [FONTS.md](FONTS.md))
+- Day chrome: date header, AM/PM, Dial|Pizza|Petals|List, Hide done, terracotta FAB
+- Nav **Day / Tasks / Reports / Settings** (Reports replaces Categories)
+- LIVE CHRONO in the dial hole when idle; circular Start/Pause when a sector is selected (no sheet over the hole)
+- Pizza/Petals hub restyle using the same tokens; LIST two interval lines; Tasks 16dp paper cards + tag chips
+- `TaskReport` text notes plus undated project backlog: one project per task, project tabs/search, and Move to diagram
+- Room schema **v5** with `fallbackToDestructiveMigration()` — **no `Migration` class**
+
+### Not in 0.5
+- Report media, PNG export, cloud, wallpaper, onboarding (week 6)
+- Pixel-perfect Stitch HTML/Tailwind
+- Git tag (do not tag unless asked)
+
+### Suggested git (do not run unless asked)
+
+```
+git add -A
+git commit -m "feat: ship TimeDial v0.5 paper craft and text reports"
+
+git tag v0.5
+```
+
 ## 0.4.0 — 2026-10-07
 
 Week 4: instances and append-only timer.

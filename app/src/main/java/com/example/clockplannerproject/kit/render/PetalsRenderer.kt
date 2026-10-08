@@ -61,8 +61,20 @@ object PetalsRenderer : DialRenderer {
         state.extras.forEachIndexed { index, path ->
             val sector = state.sectors.getOrNull(index) ?: return@forEachIndexed
             if (sector.sweepDeg <= 0f) return@forEachIndexed
+            if (sector.isSelected) {
+                drawPath(
+                    path = path,
+                    color = state.handleColor,
+                    style = state.selectionOutline,
+                )
+            }
             drawPath(path, color = sector.color)
         }
+        drawCircle(
+            color = state.canvasColor,
+            radius = state.ring.outerRadius * state.config.geometry.hubRadiusFraction,
+            center = state.ring.center,
+        )
         TimeDialRenderer.run {
             renderArcLabels(state.labels, state.labelPaint)
             if (state.showNowMarker) {

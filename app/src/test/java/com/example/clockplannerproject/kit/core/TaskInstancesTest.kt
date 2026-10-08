@@ -17,17 +17,17 @@ class TaskInstancesTest {
         colorArgb = 0xFFA8C5A0,
         blocks = listOf(TimeBlock(9 * 60, 12 * 60)),
         date = monday,
-        tags = listOf("code"),
+        project = "code",
         importance = Importance.HIGH,
     )
 
     @Test
-    fun moved_keepsIdBlocksAndTags() {
+    fun moved_keepsIdBlocksAndProject() {
         val moved = TaskInstances.moved(original, tuesday)
         assertEquals(original.id, moved.id)
         assertEquals(tuesday, moved.date)
         assertEquals(original.blocks, moved.blocks)
-        assertEquals(original.tags, moved.tags)
+        assertEquals(original.project, moved.project)
     }
 
     @Test
@@ -36,7 +36,7 @@ class TaskInstancesTest {
         assertNotEquals(original.id, copy.id)
         assertEquals("Focus", copy.title)
         assertEquals(original.blocks, copy.blocks)
-        assertEquals(original.tags, copy.tags)
+        assertEquals(original.project, copy.project)
         assertEquals(tuesday, copy.date)
         assertNull(copy.seriesId)
         val edited = copy.copy(title = "Copy title")

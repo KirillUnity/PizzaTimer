@@ -1134,195 +1134,238 @@ Acceptance: ROADMAP v0.4 DoD.
 
 ## Week 5 — v0.5
 
-### Day 29 — Report entity
+Stitch kit: `stitch_timedial_planner_ui_kit/` (theme `horological_paper_craft/DESIGN.md`). Use **PNG** as layout reference. Do **not** copy Tailwind/HTML into `:app`. Pixel-perfect is **not** required. Do **not** rewrite `TimeMath` or leftover 5:3:2. Media attachments and PNG export are **week 6**.
 
-#### Prompt (RU)
-
-```
-Роль: отчёт как сущность.
-
-Цель: TaskReport (id, taskId, createdAt, text). Room, destructive version bump, без Migration. Репозиторий observeReports(taskId).
-
-Non-goals: файлы, UI редактора текста.
-
-Acceptance: upsert/observe unit; wipe ok.
-```
-
-#### Prompt (EN)
-
-```
-Role: report entity.
-
-Goal: TaskReport; Room destructive bump; observeReports(taskId).
-
-Non-goals: files, text editor UI.
-
-Acceptance: repository test.
-```
-
-#### Why this prompt
-
-Сущность до UI и медиа.
+Shared constraints for Days 29–35: minSdk 29, Koin, MVI, packages `ui.theme` / `ui.day` / `ui.task` / `kit.compose`. Bundle **Domine** + **Plus Jakarta Sans** as `res/font` (offline, match the kit — no extra Maven).
 
 ---
 
-### Day 30 — Report text UI
+### Day 29 — Horological Paper Craft theme
 
 #### Prompt (RU)
 
 ```
-Роль: текст отчёта.
+Роль: design tokens.
 
-Цель: с карточки задачи — создать/править текст отчёта. Список отчётов задачи (дата + превью).
+Контекст: stitch_timedial_planner_ui_kit/horological_paper_craft/DESIGN.md. Color.kt, Theme.kt, Type.kt, TimeDialConfig.ColorConfig.
 
-Non-goals: picker файлов.
+Цель:
+- Light (и базовый Dark) с бумаги: canvas #FBF9F5 / #fdf9f3, ink #1C1B18, primary terracotta now #E0533C, rest sand, DONE #8E8B82.
+- Шрифты Domine (цифры/заголовки) и Plus Jakarta Sans (UI) в res/font.
+- Не встраивать HTML/Tailwind.
 
-Acceptance: текст переживает процесс (Room).
+Non-goals: отчёты, новые DialRenderer, медиа, pixel-perfect.
+
+Acceptance: @Preview Day и Tasks на бумажном фоне; now-marker и Rest берут config.colors.
 ```
 
 #### Prompt (EN)
 
 ```
-Role: report text UI.
+Role: design tokens.
 
-Goal: create/edit report text from the task card; list reports.
+Context: stitch_timedial_planner_ui_kit/horological_paper_craft/DESIGN.md. Patch Color.kt, Theme.kt, Type.kt, TimeDialConfig.ColorConfig.
 
-Non-goals: file picker.
+Goal: paper light (+ basic dark); terracotta now #E0533C; sand rest; DONE #8E8B82; Domine + Plus Jakarta Sans in res/font. No HTML/Tailwind copy.
 
-Acceptance: text survives process restart.
+Non-goals: reports, new renderers, media, pixel-perfect.
+
+Acceptance: Day and Tasks @Preview on paper; marker/rest from config.colors.
 ```
 
 #### Why this prompt
 
-Текст отдельно от permissions медиа.
+Тема до chrome, иначе каждый экран красит по-своему.
 
 ---
 
-### Day 31 — Report media attachments
+### Day 30 — Day chrome + Reports tab
 
 #### Prompt (RU)
 
 ```
-Роль: вложения локально.
+Роль: оболочка экрана Дня.
 
-Цель: прикрепить фото/файл; копия в filesDir приложения; URI/path в Room. Без облака. Permissions минимальные. Destructive DB ок.
+Контекст: stitch_timedial_planner_ui_kit/day_dial_view_am/screen.png (порядок зон). DayScreen, ViewModeRow, AppDestinations, AppBottomBar, MainActivity.
 
-Non-goals: видеоредактор, sync.
+Цель:
+- Шапка Day, стрелки даты, календарь.
+- Пилюли AM/PM; сегмент Dial | Pizza | Petals | List; Hide done.
+- FAB terracotta (создание задачи).
+- Нижняя навигация Day / Tasks / Reports / Settings — Reports вместо Categories; ui.stats заглушка до дня 34.
 
-Acceptance: вложение открывается после перезапуска; нет Migration.
+Non-goals: pixel-perfect, медиа, перепись leftover math.
+
+Acceptance: Preview: те же блоки, что на day_dial_view_am (шапка → время/hide → сегменты → циферблат → FAB → nav).
 ```
 
 #### Prompt (EN)
 
 ```
-Role: local attachments.
+Role: Day chrome.
 
-Goal: pick image/file; copy to app filesDir; store path in Room; no cloud.
+Context: stitch_timedial_planner_ui_kit/day_dial_view_am/screen.png. DayScreen, ViewModeRow, AppDestinations, AppBottomBar.
 
-Non-goals: video editor, sync.
+Goal: date header; AM/PM; Dial|Pizza|Petals|List; Hide done; terracotta FAB; nav Day/Tasks/Reports/Settings (Reports replaces Categories; ui.stats stub until day 34).
 
-Acceptance: attachment opens after process restart; no Migration.
+Non-goals: pixel-perfect, media, leftover math.
+
+Acceptance: Preview zone order matches day_dial_view_am.
 ```
 
 #### Why this prompt
 
-filesDir, не MediaStore как единственное хранилище — проще wipe.
+Stitch-chrome общий для всех видов дня.
 
 ---
 
-### Day 32 — View reports on the task
+### Day 31 — Dial states (idle, callout, running, two blocks)
 
 #### Prompt (RU)
 
 ```
-Роль: просмотр отчётов.
+Роль: визуал кольца DIAL.
 
-Цель: sheet/экран: текст + превью вложений; удаление отчёта. Связь с тем же TaskId.
+Контекст PNG:
+- stitch_timedial_planner_ui_kit/dial_idle_am/screen.png и day_dial_view_am/screen.png — idle, LIVE CHRONO (время) в отверстии.
+- dial_selected_callout, day_dial_view_selected_sector_callout, day_selected_sector_start_timer — облако + круглая Start в дырке, без sheet поверх отверстия.
+- dial_running_noon — Pause + живой сектор start→now.
+- dial_two_blocks_13 — два сектора спорта 8–9 и 12–13.
 
-Non-goals: статистика дня.
+Цель: стилизовать TimerHoleOverlay / SectorCallout / кольцо. Логику TaskTimer и append-only не ломать.
 
-Acceptance: Preview; TalkBack на кнопках вложений.
+Non-goals: Pizza/Petals, отчёты, новый renderer.
+
+Acceptance: сценарий 8–9 + Start 12:00 + Pause 13:00; первый блок неизменен; @Preview idle/selected/running.
 ```
 
 #### Prompt (EN)
 
 ```
-Role: view reports.
+Role: DIAL visuals.
 
-Goal: text + attachment preview; delete report; same TaskId.
+Context PNGs: dial_idle_am, day_dial_view_am, dial_selected_callout, day_selected_sector_start_timer, dial_running_noon, dial_two_blocks_13 under stitch_timedial_planner_ui_kit/.
 
-Non-goals: day stats.
+Goal: LIVE CHRONO in hole when idle; callout + circular Start when selected (no sheet covering the hole); Pause + live slice when running; two Sport sectors after pause. Do not break TaskTimer append-only.
 
-Acceptance: Preview; contentDescription on attach actions.
+Non-goals: Pizza/Petals, reports, new renderer.
+
+Acceptance: 8–9 + Start 12 + Pause 13; first block unchanged; Previews.
 ```
 
 #### Why this prompt
 
-Закрыть UX отчёта до цифр.
+ТЗ-таймер уже в коде; день про внешний вид Stitch.
 
 ---
 
-### Day 33 — Day statistics (secondary)
+### Day 32 — Pizza + Petals visuals
 
 #### Prompt (RU)
 
 ```
-Роль: статистика дня, вторично.
+Роль: остальные canvas-режимы.
 
-Цель: часы timed-блоков (стена часов); untimed не считать как civil duration, либо отдельно KDoc. Не дублировать leftover-формулы.
+Контекст: stitch_timedial_planner_ui_kit/pizza_two_blocks, day_pizza_view, petals_two_blocks, day_petals_view (screen.png).
 
-Non-goals: PNG export.
+Цель: те же токены цвета/дырки Start-Pause; два блока спорта. Не писать новый DialRenderer с нуля — только стиль существующих PizzaRenderer / PetalsRenderer.
 
-Acceptance: unit; hideCompleted не врёт в цифрах (stats = wall-clock truth).
+Non-goals: LIST, отчёты, pixel-perfect.
+
+Acceptance: @Preview PIZZA и PETALS с двумя секторами одной задачи.
 ```
 
 #### Prompt (EN)
 
 ```
-Role: day stats, secondary.
+Role: Pizza and Petals visuals.
 
-Goal: sum timed blocks wall-clock; document untimed; no leftover formula copy.
+Context: stitch_timedial_planner_ui_kit/pizza_two_blocks, day_pizza_view, petals_two_blocks, day_petals_view.
 
-Non-goals: PNG.
+Goal: same tokens; Start/Pause in the hole; two Sport blocks. Restyle PizzaRenderer / PetalsRenderer — do not rewrite from scratch.
 
-Acceptance: unit; stats ignore hideCompleted compact.
+Non-goals: LIST, reports, pixel-perfect.
+
+Acceptance: PIZZA and PETALS @Preview, two sectors one TaskId.
 ```
 
 #### Why this prompt
 
-Связка hideCompleted и stats — стена часов.
+Один день на два режима, логика общая с Dial.
 
 ---
 
-### Day 34 — Export or week rollup (thin)
+### Day 33 — LIST + Tasks inventory
 
 #### Prompt (RU)
 
 ```
-Роль: тонкий экспорт или неделя.
+Роль: списки.
 
-Цель: ЛИБО экспорт дня PNG как раньше, ЛИБО сводка недели по timed-минутам. Одно из двух, не оба, если не успеваешь. Без новых Gradle-модулей.
+Контекст:
+- stitch_timedial_planner_ui_kit/list_two_intervals/screen.png — ListDayView: одна задача, две строки интервалов (08:00–09:00 и 12:00–13:00), Hide done фильтр.
+- stitch_timedial_planner_ui_kit/tasks_list_inventory/screen.png — TasksScreen: chips тегов, карточки radius 16dp.
 
-Non-goals: магазины, календарь.
+Цель: ListDayView и TasksScreen в paper-chrome. Не считать leftover в UI.
 
-Acceptance: одна фича работает; CHANGELOG черновик.
+Non-goals: отчёты, медиа.
+
+Acceptance: @Preview LIST и Tasks; две строки времени у одной задачи.
 ```
 
 #### Prompt (EN)
 
 ```
-Role: thin export or week rollup.
+Role: lists.
 
-Goal: either PNG day export or week timed-minutes — one feature.
+Context: stitch_timedial_planner_ui_kit/list_two_intervals and tasks_list_inventory.
 
-Non-goals: stores, calendar.
+Goal: ListDayView shows two interval lines per task; TasksScreen tag chips and 16dp cards. No leftover math in UI.
 
-Acceptance: one shippable feature.
+Non-goals: reports, media.
+
+Acceptance: LIST and Tasks @Preview; two times on one Sport row.
 ```
 
 #### Why this prompt
 
-Не раздувать неделю 5: отчёты главные.
+LIST в ТЗ — Compose, не Canvas.
+
+---
+
+### Day 34 — Report text (thin)
+
+#### Prompt (RU)
+
+```
+Роль: тонкий домен отчёта v0.5.
+
+Цель:
+- TaskReport (id, taskId, createdAt, text).
+- Room version++ и только fallbackToDestructiveMigration(); класса Migration нет.
+- С карточки задачи: создать/править текст; список отчётов (дата + превью).
+- Экран Reports-заглушка показывает список или CTA. Тот же paper-chrome.
+
+Non-goals: файлы, picker, PNG export, облако.
+
+Acceptance: unit upsert/observeReports(taskId); текст после перезапуска процесса; wipe схемы ок.
+```
+
+#### Prompt (EN)
+
+```
+Role: thin report domain.
+
+Goal: TaskReport (id, taskId, createdAt, text); destructive Room bump; create/edit/list from the task card; Reports tab in paper chrome.
+
+Non-goals: files, picker, PNG export, cloud.
+
+Acceptance: repository unit; text survives process death; wipe OK.
+```
+
+#### Why this prompt
+
+Медиа сознательно на неделю 6, чтобы влез дизайн.
 
 ---
 
@@ -1331,11 +1374,11 @@ Acceptance: one shippable feature.
 #### Prompt (RU)
 
 ```
-Роль: tech lead v0.5. Без подложек недели 6.
+Роль: tech lead v0.5. Без медиа, подложек и онбординга недели 6.
 
-Цель: регрессия отчётов+медиа; CHANGELOG v0.5.
+Цель: регрессия темы, chrome, Dial/Pizza/Petals/LIST, таймер append-only, отчёт-текст; CHANGELOG 0.5.0; versionName 0.5.0.
 
-Acceptance: DoD v0.5 ROADMAP.
+Acceptance: DoD v0.5 ROADMAP. git tag только если пользователь просит.
 ```
 
 #### Prompt (EN)
@@ -1343,20 +1386,52 @@ Acceptance: DoD v0.5 ROADMAP.
 ```
 Role: tech lead v0.5.
 
-Goal: reports+media regression; CHANGELOG v0.5. No week-6 backgrounds.
+Goal: regression theme + chrome + four view modes + timer + report text; CHANGELOG 0.5.0; versionName 0.5.0. No media, backgrounds, or onboarding.
 
-Acceptance: ROADMAP v0.5 DoD.
+Acceptance: ROADMAP v0.5 DoD. Tag only if the user asks.
 ```
 
 #### Why this prompt
 
-Бан подложек.
+Бан медиа и подложек в день полировки.
 
 ---
 
 ## Week 6 — v1.0-android
 
-### Day 36 — Backgrounds / underlays
+### Day 36 — Report media attachments
+
+#### Prompt (RU)
+
+```
+Роль: вложения локально (перенесено с недели 5).
+
+Цель: прикрепить фото/файл к TaskReport; копия в filesDir; path/URI в Room. Без облака. Permissions минимальные. version++ и fallbackToDestructiveMigration(), класса Migration нет. Превью и удаление вложения. Paper-chrome как v0.5.
+
+Non-goals: видеоредактор, sync, PNG дня как отдельный продукт.
+
+Acceptance: вложение открывается после перезапуска процесса; TalkBack на кнопках вложений.
+```
+
+#### Prompt (EN)
+
+```
+Role: local attachments (moved from week 5).
+
+Goal: pick image/file on TaskReport; copy to app filesDir; store path in Room; no cloud; destructive schema bump only. Preview and delete. Keep v0.5 paper chrome.
+
+Non-goals: video editor, sync, day PNG as a product.
+
+Acceptance: attachment opens after process restart; contentDescription on attach actions.
+```
+
+#### Why this prompt
+
+Медиа после дизайна, чтобы неделя 5 влезла. filesDir, не облако.
+
+---
+
+### Day 37 — Backgrounds / underlays
 
 #### Prompt (RU)
 
@@ -1391,7 +1466,7 @@ Acceptance: preset under DIAL and PIZZA; text readable.
 
 ---
 
-### Day 37 — Settings + DataStore (mode, colors, background)
+### Day 38 — Settings + DataStore (mode, colors, background)
 
 #### Prompt (RU)
 
@@ -1423,7 +1498,7 @@ Prefs ≠ Room. Не писать Migration.
 
 ---
 
-### Day 38 — Onboarding + empty-state journey
+### Day 39 — Onboarding + empty-state journey
 
 #### Prompt (RU)
 
@@ -1455,7 +1530,7 @@ Acceptance: skip works; seen persisted.
 
 ---
 
-### Day 39 — Localization ru / en
+### Day 40 — Localization ru / en
 
 #### Prompt (RU)
 
@@ -1483,7 +1558,7 @@ Acceptance: system locale switches UI.
 
 ---
 
-### Day 40 — Accessibility
+### Day 41 — Accessibility
 
 #### Prompt (RU)
 
@@ -1511,7 +1586,7 @@ Acceptance: no gesture-only primary actions.
 
 ---
 
-### Day 41 — Icon, splash, tests, README
+### Day 42 — Icon, splash, tests, README
 
 #### Prompt (RU)
 
@@ -1543,7 +1618,7 @@ Acceptance: README states destructive schema.
 
 ---
 
-### Day 42 — Play-ready checklist, tag v1.0-android
+### Day 43 — Play-ready checklist, tag v1.0-android
 
 #### Prompt (RU)
 

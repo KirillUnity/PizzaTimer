@@ -5,6 +5,20 @@
     <string name="nav_settings">Настройки</string>
     <string name="nav_create">Создать</string>
     <string name="nav_categories">Категории</string>
+    <string name="nav_reports">Отчёты</string>
+    <string name="cd_nav_reports">Текстовые отчёты</string>
+    <string name="day_title">День</string>
+    <string name="day_subtitle">Горологический меридиан · 24ч</string>
+    <string name="dial_live_chrono">Живой хроно</string>
+    <string name="fab_log_sector">Новый сектор</string>
+    <string name="reports_title">Отчёты</string>
+    <string name="reports_empty">Заметок пока нет. Откройте задачу и добавьте текст.</string>
+    <string name="reports_cta">Заметки только на устройстве. Вложения — позже.</string>
+    <string name="report_add">Добавить заметку</string>
+    <string name="report_save">Сохранить заметку</string>
+    <string name="report_hint">Что произошло в этом блоке?</string>
+    <string name="report_edit">Править заметку</string>
+    <string name="task_reports">Заметки</string>
     <string name="tasks_placeholder">Список задач — неделя 2</string>
     <string name="tasks_empty">На этот день нет задач. Нажмите +, чтобы добавить.</string>
     <string name="tasks_date_loading">Загрузка даты…</string>
@@ -47,6 +61,14 @@
     <string name="task_tag_add">Добавить тег</string>
     <string name="task_tag_confirm">Добавить</string>
     <string name="task_tags_all">Все теги</string>
+    <string name="task_project">Проект (необязательно)</string>
+    <string name="task_projects_all">Все</string>
+    <string name="task_project_search">Поиск проектов</string>
+    <string name="task_project_search_clear">Очистить</string>
+    <string name="task_backlog_toggle">Без даты / Бэклог</string>
+    <string name="task_backlog">Бэклог · без даты</string>
+    <string name="task_move_to_diagram">На диаграмму</string>
+    <string name="cd_move_to_diagram">Перенести «%1$s» на диаграмму выбранного дня</string>
     <string name="cd_create_task">Создать задачу</string>
     <string name="cd_delete_task">Удалить %1$s</string>
     <string name="cd_task_color">Цвет задачи %1$s</string>
@@ -104,4 +126,5 @@
     <string name="cd_timer_start">Запустить таймер выбранной задачи</string>
     <string name="cd_timer_pause">Приостановить таймер выбранной задачи</string>
     <string name="cd_sector_callout">Описание «%1$s». Нажмите, чтобы закрыть.</string>
+    <string name="task_details">Подробнее</string>
 </resources>

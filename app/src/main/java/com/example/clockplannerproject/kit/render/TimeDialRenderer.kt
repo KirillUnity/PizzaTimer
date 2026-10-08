@@ -46,7 +46,13 @@ object TimeDialRenderer : DialRenderer {
     ): List<androidx.compose.ui.graphics.Path> = emptyList()
 
     override fun DrawScope.render(state: DialDrawState) {
-        renderTaskSectors(state.sectors, state.ring, state.stroke)
+        renderTaskSectors(
+            sectors = state.sectors,
+            ring = state.ring,
+            stroke = state.stroke,
+            selectedStroke = state.selectedStroke,
+            selectionColor = state.handleColor,
+        )
         renderArcLabels(state.labels, state.labelPaint)
         if (state.showNowMarker) {
             renderFocusChevron(state.chevron, state.chevronColor, state.markerAlpha)
@@ -81,9 +87,22 @@ object TimeDialRenderer : DialRenderer {
         sectors: List<PreparedSector>,
         ring: RingLayout,
         stroke: Stroke,
+        selectedStroke: Stroke,
+        selectionColor: Color,
     ) {
         sectors.forEach { sector ->
             if (sector.sweepDeg <= 0f) return@forEach
+            if (sector.isSelected) {
+                drawArc(
+                    color = selectionColor,
+                    startAngle = sector.canvasStartDeg,
+                    sweepAngle = sector.sweepDeg,
+                    useCenter = false,
+                    topLeft = ring.topLeft,
+                    size = ring.arcSize,
+                    style = selectedStroke,
+                )
+            }
             drawArc(
                 color = sector.color,
                 startAngle = sector.canvasStartDeg,

@@ -8,8 +8,6 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import kotlinx.datetime.LocalDate
 
-internal const val TAGS_SEPARATOR: Char = '\u001F'
-
 internal fun TaskEntity.toDomain(blocks: List<TimeBlockEntity>): Task = Task(
     id = TaskId(id),
     title = title,
@@ -17,9 +15,9 @@ internal fun TaskEntity.toDomain(blocks: List<TimeBlockEntity>): Task = Task(
     colorArgb = colorArgb,
     blocks = blocks.sortedBy { it.sortIndex }.map { it.toDomain() },
     status = TaskStatus.valueOf(status),
-    date = LocalDate.parse(dateIso),
+    date = dateIso?.let(LocalDate::parse),
     importance = runCatching { Importance.valueOf(importance) }.getOrDefault(Importance.MEDIUM),
-    tags = decodeTags(tagsCsv),
+    project = project?.trim()?.takeIf { it.isNotEmpty() },
     recurrence = decodeRecurrence(recurrenceKind, weekdaysMask),
     seriesId = seriesId,
 )
@@ -32,9 +30,9 @@ internal fun Task.toEntity(): TaskEntity = TaskEntity(
     description = description,
     colorArgb = colorArgb,
     status = status.name,
-    dateIso = date.toString(),
+    dateIso = date?.toString(),
     importance = importance.name,
-    tagsCsv = encodeTags(tags),
+    project = normalizedProject,
     recurrenceKind = encodeRecurrenceKind(recurrence),
     weekdaysMask = encodeWeekdaysMask(recurrence),
     seriesId = seriesId,
@@ -55,12 +53,6 @@ internal fun TimeBlockEntity.toDomain(): TimeBlock = TimeBlock(
     startMinute = startMinute,
     endMinute = endMinute,
 )
-
-internal fun encodeTags(tags: List<String>): String =
-    tags.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(TAGS_SEPARATOR.toString())
-
-internal fun decodeTags(csv: String): List<String> =
-    if (csv.isEmpty()) emptyList() else csv.split(TAGS_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
 
 internal fun decodeRecurrence(kind: String, mask: Int): RecurrenceRule = when (kind) {
     "DAILY" -> RecurrenceRule.Daily

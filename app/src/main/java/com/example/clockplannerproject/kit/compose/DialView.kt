@@ -4,12 +4,16 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -18,11 +22,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
@@ -41,6 +47,7 @@ import com.example.clockplannerproject.kit.render.isNearResizeHandle
 import com.example.clockplannerproject.kit.render.layoutRing
 import com.example.clockplannerproject.kit.render.prepareSectors
 import com.example.clockplannerproject.kit.render.visualSliceEndDeg
+import androidx.core.content.res.ResourcesCompat
 
 /**
  * Canvas host. One-finger tap/resize; two-finger twist rotates the scene.
@@ -77,6 +84,13 @@ fun DialView(
     val geometry = config.geometry
     val clock = config.clock
     val interaction = config.interaction
+    val context = LocalContext.current
+    val dialTypeface = remember(context) {
+        ResourcesCompat.getFont(context, R.font.domine) ?: Typeface.SERIF
+    }
+    val canvasColor = remember(config.colors.canvasArgb) {
+        argbToColor(config.colors.canvasArgb)
+    }
     val realTasks = remember(tasks) { tasks }
     val compact = clock.reflowMode == ReflowMode.CompactRemaining
     val anchorMinute = if (clock.snapToNow && !compact) {
@@ -131,9 +145,7 @@ fun DialView(
                     selectedTask = selectedTask,
                     isNearHandle = { offset, task ->
                         val now = nowMinute.toInt()
-                        val closed = task.blocks.firstOrNull()?.isClosed(now) == true
-                        val running = task.blocks.any { it.isOpen }
-                        if (closed || running) {
+                        if (!interaction.resizeEnabled || task.blocks.any { it.isOpen }) {
                             false
                         } else {
                             val ring = layoutRing(canvasSize, geometry)
@@ -147,6 +159,7 @@ fun DialView(
                                 anchorMinute = anchorMinute,
                                 userRotationOffsetDeg = interaction.userRotationOffsetDeg,
                                 slopDeg = interaction.resizeHandleDeg,
+                                nowMinute = now,
                             )
                         }
                     },
@@ -191,6 +204,11 @@ fun DialView(
                 .drawWithCache {
                     val ring = layoutRing(size, geometry)
                     val stroke = Stroke(width = ring.thickness, cap = StrokeCap.Butt)
+                    val selectedStroke = Stroke(
+                        width = ring.thickness + 6f,
+                        cap = StrokeCap.Butt,
+                    )
+                    val selectionOutline = Stroke(width = 6f)
                     val sectors = prepareSectors(
                         tasks = tasks,
                         colors = sectorColors,
@@ -203,7 +221,7 @@ fun DialView(
                         textSize = (ring.thickness * geometry.labelFontFractionOfThickness)
                             .coerceAtLeast(10f)
                         textAlign = Paint.Align.CENTER
-                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                        typeface = dialTypeface
                         isSubpixelText = true
                     }
                     val labels = renderer.prepareLabels(sectors, ring, geometry, labelPaint)
@@ -223,6 +241,7 @@ fun DialView(
                             half = half,
                             anchorMinute = anchorMinute,
                             userRotationOffsetDeg = interaction.userRotationOffsetDeg,
+                            nowMinute = nowMinute.toInt(),
                         )
                     }
                     val drawState = DialDrawState(
@@ -233,17 +252,37 @@ fun DialView(
                         extras = extras,
                         labelPaint = labelPaint,
                         stroke = stroke,
+                        selectedStroke = selectedStroke,
+                        selectionOutline = selectionOutline,
                         chevron = chevron,
                         showNowMarker = clock.showNowMarker,
                         chevronColor = chevronColor,
                         markerAlpha = markerAlpha,
                         handleDeg = handleDeg,
                         handleColor = handleColor,
+                        canvasColor = canvasColor,
                     )
                     onDrawBehind {
                         with(renderer) { render(drawState) }
                     }
                 },
         )
+        DialNumerals(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(2.dp),
+        )
+    }
+}
+
+@Composable
+private fun DialNumerals(modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        val style = MaterialTheme.typography.labelMedium
+        val color = MaterialTheme.colorScheme.onSurfaceVariant
+        Text("12", style = style, color = color, modifier = Modifier.align(Alignment.TopCenter))
+        Text("3", style = style, color = color, modifier = Modifier.align(Alignment.CenterEnd))
+        Text("6", style = style, color = color, modifier = Modifier.align(Alignment.BottomCenter))
+        Text("9", style = style, color = color, modifier = Modifier.align(Alignment.CenterStart))
     }
 }

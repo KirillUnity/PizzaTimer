@@ -96,10 +96,10 @@ fun TaskBottomSheetBody(
             },
             style = MaterialTheme.typography.bodyLarge,
         )
-        if (task.tags.isNotEmpty()) {
+        task.normalizedProject?.let { project ->
             Spacer(Modifier.height(8.dp))
             Text(
-                text = task.tags.joinToString(),
+                text = project,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.secondary,
             )

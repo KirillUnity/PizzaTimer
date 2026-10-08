@@ -22,6 +22,6 @@ enum class AppDestinations(
 ) {
     DAY(R.string.nav_day, R.string.cd_nav_day, Icons.Filled.DateRange),
     TASKS(R.string.nav_tasks, R.string.cd_nav_tasks, Icons.AutoMirrored.Filled.List),
-    CATEGORIES(R.string.nav_categories, R.string.cd_nav_categories, Icons.Filled.Star),
+    REPORTS(R.string.nav_reports, R.string.cd_nav_reports, Icons.Filled.Star),
     SETTINGS(R.string.nav_settings, R.string.cd_nav_settings, Icons.Filled.Settings),
 }

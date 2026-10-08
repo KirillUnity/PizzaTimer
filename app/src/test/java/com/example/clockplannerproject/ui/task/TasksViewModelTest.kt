@@ -1,8 +1,11 @@
 package com.example.clockplannerproject.ui.task
 
+import com.example.clockplannerproject.kit.core.ReportId
+import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskId
+import com.example.clockplannerproject.kit.core.TaskReport
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TimeProvider
@@ -43,7 +46,7 @@ class TasksViewModelTest {
 
     @Test
     fun update_rejectsEmptyTitle() {
-        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)
         viewModel.onIntent(TasksUiIntent.ChangeTitle("  "))
         viewModel.onIntent(TasksUiIntent.Update)
@@ -56,9 +59,11 @@ class TasksViewModelTest {
     @Test
     fun update_persistsValidTask() {
         val repository = FakeTaskRepository()
-        val viewModel = TasksViewModel(repository, FakeTimeProvider(date))
+        val viewModel = TasksViewModel(repository, FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)
         viewModel.onIntent(TasksUiIntent.ChangeTitle("Focus"))
+        viewModel.onIntent(TasksUiIntent.ChangeScheduled(true))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
         viewModel.onIntent(TasksUiIntent.ChangeBlockStart(0, 9 * 60))
         viewModel.onIntent(TasksUiIntent.ChangeBlockEnd(0, 10 * 60))
         viewModel.onIntent(TasksUiIntent.Update)
@@ -70,9 +75,11 @@ class TasksViewModelTest {
 
     @Test
     fun update_persistsOvernightRange() {
-        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)
         viewModel.onIntent(TasksUiIntent.ChangeTitle("Sleep"))
+        viewModel.onIntent(TasksUiIntent.ChangeScheduled(true))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
         viewModel.onIntent(TasksUiIntent.ChangeBlockStart(0, 22 * 60))
         viewModel.onIntent(TasksUiIntent.ChangeBlockEnd(0, 6 * 60))
         viewModel.onIntent(TasksUiIntent.Update)
@@ -92,7 +99,7 @@ class TasksViewModelTest {
             blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
             date = date,
         )
-        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Edit(task))
         viewModel.onIntent(TasksUiIntent.ChangeTitle("Deep work"))
         viewModel.onIntent(TasksUiIntent.Update)
@@ -112,7 +119,7 @@ class TasksViewModelTest {
             date = date,
         )
         val repository = FakeTaskRepository(listOf(task))
-        val viewModel = TasksViewModel(repository, FakeTimeProvider(date))
+        val viewModel = TasksViewModel(repository, FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Delete(task))
         viewModel.onIntent(TasksUiIntent.ConfirmDelete)
 
@@ -130,7 +137,7 @@ class TasksViewModelTest {
             blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
             date = other,
         )
-        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.SelectDate(other))
         assertEquals(other, viewModel.state.value.date)
         assertEquals("Later", viewModel.state.value.tasks.single().title)
@@ -139,7 +146,7 @@ class TasksViewModelTest {
 
     @Test
     fun update_savesUntimedWhenTitleNonEmpty() {
-        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)
         viewModel.onIntent(TasksUiIntent.ChangeTitle("Inbox"))
         viewModel.onIntent(TasksUiIntent.ClearTime)
@@ -150,16 +157,14 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun update_persistsTwoTags() {
-        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date))
+    fun update_persistsOneNormalizedProject() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)
         viewModel.onIntent(TasksUiIntent.ChangeTitle("Focus"))
-        viewModel.onIntent(TasksUiIntent.ChangeTagDraft("code"))
-        viewModel.onIntent(TasksUiIntent.AddTag)
-        viewModel.onIntent(TasksUiIntent.ChangeTagDraft("deep"))
-        viewModel.onIntent(TasksUiIntent.AddTag)
+        viewModel.onIntent(TasksUiIntent.ChangeProject("  Deep Work  "))
         viewModel.onIntent(TasksUiIntent.Update)
-        assertEquals(listOf("code", "deep"), viewModel.state.value.tasks.single().tags)
+        assertEquals("Deep Work", viewModel.state.value.tasks.single().project)
+        assertNull(viewModel.state.value.tasks.single().date)
     }
 
     @Test
@@ -170,9 +175,9 @@ class TasksViewModelTest {
             colorArgb = 0xFF3949AB,
             blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
             date = date,
-            tags = listOf("code"),
+            project = "code",
         )
-        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Duplicate(task))
         assertEquals(2, viewModel.state.value.tasks.size)
         val copy = viewModel.state.value.tasks.single { it.id != task.id }
@@ -194,35 +199,99 @@ class TasksViewModelTest {
             date = date,
         )
         val dest = LocalDate(2026, 10, 8)
-        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date))
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.RequestMove(task))
         viewModel.onIntent(TasksUiIntent.ConfirmMove(dest))
-        assertTrue(viewModel.state.value.tasks.isEmpty())
+        assertEquals(dest, viewModel.state.value.tasks.single().date)
         viewModel.onIntent(TasksUiIntent.SelectDate(dest))
         assertEquals("Focus", viewModel.state.value.tasks.single().title)
         assertEquals(task.id, viewModel.state.value.tasks.single().id)
     }
 
     @Test
-    fun filterByTag_narrowsList() {
+    fun filterByProject_narrowsList() {
         val work = Task(
             id = TaskId("a"),
             title = "A",
             colorArgb = 0xFF3949AB,
             blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
             date = date,
-            tags = listOf("code"),
+            project = "Code",
         )
         val gym = Task(
             id = TaskId("b"),
             title = "B",
             colorArgb = 0xFFE8B4B8,
             date = date,
-            tags = listOf("sport"),
+            project = "Sport",
         )
-        val viewModel = TasksViewModel(FakeTaskRepository(listOf(work, gym)), FakeTimeProvider(date))
-        viewModel.onIntent(TasksUiIntent.FilterByTag("sport"))
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(work, gym)), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.FilterByProject("sport"))
         assertEquals(listOf("B"), viewModel.state.value.visibleTasks.map { it.title })
+    }
+
+    @Test
+    fun projectSearch_isCaseInsensitiveSubstring_andSortIsDeterministic() {
+        val tasks = listOf(
+            Task(TaskId("3"), "Zulu", colorArgb = 1, date = null, project = "Research"),
+            Task(TaskId("2"), "Alpha", colorArgb = 1, date = null, project = "research"),
+            Task(TaskId("1"), "Other", colorArgb = 1, date = date, project = "Home"),
+        )
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(tasks),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+        )
+        viewModel.onIntent(TasksUiIntent.ChangeProjectSearch("SEA"))
+
+        assertEquals(listOf("research"), viewModel.state.value.availableProjects.map { it.lowercase() })
+        assertEquals(listOf("Alpha", "Zulu"), viewModel.state.value.visibleTasks.map { it.title })
+    }
+
+    @Test
+    fun moveToDiagram_assignsSelectedDate_preservesProject_andClearsBlocks() {
+        val backlog = Task(
+            id = TaskId("backlog"),
+            title = "Plan",
+            colorArgb = 1,
+            date = null,
+            project = "Launch",
+        )
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(backlog)),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+        )
+
+        viewModel.onIntent(TasksUiIntent.MoveToDiagram(backlog))
+
+        val moved = viewModel.state.value.tasks.single()
+        assertEquals(date, moved.date)
+        assertEquals("Launch", moved.project)
+        assertTrue(moved.blocks.isEmpty())
+    }
+
+    @Test
+    fun saveReport_upsertsForEditedTask() {
+        val task = Task(
+            id = TaskId("keep"),
+            title = "Focus",
+            colorArgb = 0xFF3949AB,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val reports = FakeReportRepository()
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(task)),
+            FakeTimeProvider(date),
+            reports,
+        )
+        viewModel.onIntent(TasksUiIntent.Edit(task))
+        viewModel.onIntent(TasksUiIntent.ChangeReportDraft("Shipped the ring."))
+        viewModel.onIntent(TasksUiIntent.SaveReport)
+        assertEquals(1, viewModel.state.value.reports.size)
+        assertEquals("Shipped the ring.", viewModel.state.value.reports.single().text)
+        assertEquals(task.id, viewModel.state.value.reports.single().taskId)
     }
 }
 
@@ -233,6 +302,11 @@ private class FakeTaskRepository(
 
     override fun observeTasks(date: LocalDate): Flow<List<Task>> =
         items.map { list -> list.filter { it.date == date } }
+
+    override fun observeUnscheduled(): Flow<List<Task>> =
+        items.map { list -> list.filter { it.date == null } }
+
+    override fun observeAll(): Flow<List<Task>> = items
 
     override suspend fun upsert(task: Task) {
         items.update { current -> current.filterNot { it.id == task.id } + task }
@@ -251,6 +325,23 @@ private class FakeTaskRepository(
         items.value.any { task ->
             task.date == date && (task.seriesId == seriesId || task.id.value == seriesId)
         }
+}
+
+private class FakeReportRepository : ReportRepository {
+    private val items = MutableStateFlow<List<TaskReport>>(emptyList())
+
+    override fun observeReports(taskId: TaskId): Flow<List<TaskReport>> =
+        items.map { list -> list.filter { it.taskId == taskId } }
+
+    override fun observeAllReports(): Flow<List<TaskReport>> = items
+
+    override suspend fun upsert(report: TaskReport) {
+        items.update { current -> current.filterNot { it.id == report.id } + report }
+    }
+
+    override suspend fun delete(id: ReportId) {
+        items.update { current -> current.filterNot { it.id == id } }
+    }
 }
 
 private class FakeTimeProvider(

@@ -31,6 +31,7 @@ data class PreparedSector(
     val color: Color,
     val title: String,
     val labelArgb: Int,
+    val isSelected: Boolean,
 )
 
 fun layoutRing(canvasSize: Size, geometry: GeometryConfig): RingLayout {
@@ -127,6 +128,7 @@ fun prepareSectors(
                 labelArgb = contrastingLabelArgb(
                     color.toArgb().toLong() and 0xFFFFFFFFL,
                 ).toInt(),
+                isSelected = task.id == selectedTaskId,
             )
         }
     }

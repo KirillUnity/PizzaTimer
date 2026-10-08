@@ -123,7 +123,7 @@ internal suspend fun PointerInputScope.detectTwoFingerRotate(
     val bounds = if (canvasSize.width > 0f && canvasSize.height > 0f) {
         canvasSize
     } else {
-        Size(size.width, size.height)
+        Size(size.width.toFloat(), size.height.toFloat())
     }
     if (bounds.width <= 0f || bounds.height <= 0f) return
     awaitEachGesture {

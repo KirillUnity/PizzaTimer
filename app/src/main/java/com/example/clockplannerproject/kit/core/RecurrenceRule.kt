@@ -39,13 +39,13 @@ sealed class RecurrenceRule {
     }
 
     companion object {
-        /** Bit 0 = Monday … bit 6 = Sunday ([DayOfWeek.isoDayNumber] − 1). */
+        /** Bit 0 = Monday … bit 6 = Sunday (`DayOfWeek.value` − 1, ISO). */
         fun maskFor(days: Set<DayOfWeek>): Int =
-            days.fold(0) { acc, day -> acc or (1 shl (day.isoDayNumber - 1)) }
+            days.fold(0) { acc, day -> acc or (1 shl (day.value - 1)) }
 
         fun daysFromMask(mask: Int): Set<DayOfWeek> =
             DayOfWeek.entries.filter { day ->
-                mask and (1 shl (day.isoDayNumber - 1)) != 0
+                mask and (1 shl (day.value - 1)) != 0
             }.toSet()
     }
 }

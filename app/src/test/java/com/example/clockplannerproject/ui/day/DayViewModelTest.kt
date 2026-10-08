@@ -113,10 +113,40 @@ class DayViewModelTest {
         viewModel.onIntent(DayUiIntent.SelectTask(work))
         viewModel.onIntent(DayUiIntent.ResizePreview(work.id, 13 * 60))
         assertEquals(13 * 60, viewModel.state.value.dialTasks.single().endMinute)
-        assertEquals(13 * 60, viewModel.state.value.sheetTask?.endMinute)
+        assertEquals(13 * 60, viewModel.state.value.overlayTask?.endMinute)
+        assertNull(viewModel.state.value.sheetTask)
         viewModel.onIntent(DayUiIntent.CancelResize)
         assertEquals(12 * 60, viewModel.state.value.dialTasks.single().endMinute)
         assertNull(viewModel.state.value.resizingTaskId)
+    }
+
+    @Test
+    fun selectTask_doesNotOpenSheet() {
+        val viewModel = dayViewModel(listOf(work))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        assertEquals(work.id, viewModel.state.value.selectedTask?.id)
+        assertEquals(work.id, viewModel.state.value.overlayTask?.id)
+        assertNull(viewModel.state.value.sheetTask)
+        assertEquals(false, viewModel.state.value.detailsOpen)
+    }
+
+    @Test
+    fun openTaskDetails_showsSheet_dismissDetailsKeepsSelection() {
+        val viewModel = dayViewModel(listOf(work))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.OpenTaskDetails())
+        assertEquals(work.id, viewModel.state.value.sheetTask?.id)
+        viewModel.onIntent(DayUiIntent.DismissDetails)
+        assertEquals(work.id, viewModel.state.value.selectedTask?.id)
+        assertNull(viewModel.state.value.sheetTask)
+    }
+
+    @Test
+    fun openTaskDetails_fromList_selectsAndOpensSheet() {
+        val viewModel = dayViewModel(listOf(work))
+        viewModel.onIntent(DayUiIntent.OpenTaskDetails(work))
+        assertEquals(work.id, viewModel.state.value.selectedTask?.id)
+        assertEquals(work.id, viewModel.state.value.sheetTask?.id)
     }
 
     @Test
@@ -175,6 +205,32 @@ class DayViewModelTest {
     }
 
     @Test
+    fun resizePreview_closedFirstBlock_doesNotLockLaterBlock() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(10 * 60, 11 * 60)),
+            date = date,
+        )
+        val viewModel = dayViewModel(listOf(sport), LocalTime(9, 30))
+        viewModel.onIntent(DayUiIntent.ResizePreview(sport.id, 12 * 60, 8 * 60))
+        assertNull(viewModel.state.value.resizingTaskId)
+        viewModel.onIntent(DayUiIntent.ResizePreview(sport.id, 12 * 60, 10 * 60))
+        assertEquals(sport.id, viewModel.state.value.resizingTaskId)
+        assertEquals(12 * 60, viewModel.state.value.overlayTask?.blocks?.last()?.endMinute)
+        assertEquals(TimeBlock(8 * 60, 9 * 60), viewModel.state.value.overlayTask?.blocks?.first())
+    }
+
+    @Test
+    fun previousDay_shiftsSelectedDate() {
+        val viewModel = dayViewModel(listOf(work))
+        assertEquals(date, viewModel.state.value.date)
+        viewModel.onIntent(DayUiIntent.PreviousDay)
+        assertEquals(LocalDate(2026, 10, 5), viewModel.state.value.date)
+    }
+
+    @Test
     fun confirmDelete_removesTaskAndSheet() {
         val viewModel = dayViewModel(listOf(work))
         viewModel.onIntent(DayUiIntent.SelectTask(work))
@@ -206,6 +262,11 @@ private class FakeTaskRepository(
 
     override fun observeTasks(date: LocalDate): Flow<List<Task>> =
         items.map { list -> list.filter { it.date == date } }
+
+    override fun observeUnscheduled(): Flow<List<Task>> =
+        items.map { list -> list.filter { it.date == null } }
+
+    override fun observeAll(): Flow<List<Task>> = items
 
     override suspend fun upsert(task: Task) {
         items.update { current -> current.filterNot { it.id == task.id } + task }

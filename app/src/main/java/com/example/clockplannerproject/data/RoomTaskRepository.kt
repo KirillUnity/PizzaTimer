@@ -27,11 +27,31 @@ class RoomTaskRepository(
             }
             .flowOn(ioDispatcher)
 
+    override fun observeUnscheduled(): Flow<List<Task>> =
+        taskDao.observeUnscheduled()
+            .map { rows -> rows.map { it.toDomain() }.sortedWith(taskOrdering) }
+            .flowOn(ioDispatcher)
+
+    override fun observeAll(): Flow<List<Task>> =
+        taskDao.observeAll()
+            .map { rows -> rows.map { it.toDomain() }.sortedWith(taskOrdering) }
+            .flowOn(ioDispatcher)
+
     override suspend fun upsert(task: Task) {
         withContext(ioDispatcher) {
-            taskDao.upsertTask(task.toEntity())
-            taskDao.deleteBlocks(task.id.value)
-            val blocks = task.toBlockEntities()
+            val normalized = if (task.date == null) {
+                task.copy(
+                    project = task.normalizedProject,
+                    blocks = emptyList(),
+                    recurrence = com.example.clockplannerproject.kit.core.RecurrenceRule.None,
+                    seriesId = null,
+                )
+            } else {
+                task.copy(project = task.normalizedProject)
+            }
+            taskDao.upsertTask(normalized.toEntity())
+            taskDao.deleteBlocks(normalized.id.value)
+            val blocks = normalized.toBlockEntities()
             if (blocks.isNotEmpty()) {
                 taskDao.insertBlocks(blocks)
             }
@@ -58,3 +78,12 @@ class RoomTaskRepository(
             taskDao.countSeriesOnDate(seriesId, date.toString()) > 0
         }
 }
+
+private val taskOrdering = compareBy<Task>(
+    { it.normalizedProject?.lowercase().orEmpty() },
+    { it.date == null },
+    { it.date },
+    { it.sortMinute },
+    { it.title.lowercase() },
+    { it.id.value },
+)

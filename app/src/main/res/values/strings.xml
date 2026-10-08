@@ -5,6 +5,20 @@
     <string name="nav_settings">Settings</string>
     <string name="nav_create">Create</string>
     <string name="nav_categories">Categories</string>
+    <string name="nav_reports">Reports</string>
+    <string name="cd_nav_reports">Text reports</string>
+    <string name="day_title">Day</string>
+    <string name="day_subtitle">Horology meridian · 24h</string>
+    <string name="dial_live_chrono">Live chrono</string>
+    <string name="fab_log_sector">Log new chrono sector</string>
+    <string name="reports_title">Reports</string>
+    <string name="reports_empty">No notes yet. Open a task and add a text report.</string>
+    <string name="reports_cta">Notes stay on the device. Attachments come later.</string>
+    <string name="report_add">Add note</string>
+    <string name="report_save">Save note</string>
+    <string name="report_hint">What happened in this block?</string>
+    <string name="report_edit">Edit note</string>
+    <string name="task_reports">Notes</string>
     <string name="tasks_placeholder">Task list coming in week 2</string>
     <string name="tasks_empty">No tasks on this day. Tap + to add one.</string>
     <string name="tasks_date_loading">Loading date…</string>
@@ -47,6 +61,14 @@
     <string name="task_tag_add">Add a tag</string>
     <string name="task_tag_confirm">Add</string>
     <string name="task_tags_all">All tags</string>
+    <string name="task_project">Project (optional)</string>
+    <string name="task_projects_all">All</string>
+    <string name="task_project_search">Search projects</string>
+    <string name="task_project_search_clear">Clear</string>
+    <string name="task_backlog_toggle">No date / Backlog</string>
+    <string name="task_backlog">Backlog · no date</string>
+    <string name="task_move_to_diagram">Move to diagram</string>
+    <string name="cd_move_to_diagram">Move %1$s to the selected day diagram</string>
     <string name="cd_create_task">Create task</string>
     <string name="cd_delete_task">Delete %1$s</string>
     <string name="cd_task_color">Color for %1$s</string>
@@ -104,4 +126,5 @@
     <string name="cd_timer_start">Start timer for selected task</string>
     <string name="cd_timer_pause">Pause timer for selected task</string>
     <string name="cd_sector_callout">Description for %1$s. Tap to dismiss.</string>
+    <string name="task_details">Details</string>
 </resources>

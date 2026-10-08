@@ -53,6 +53,42 @@ fun clipTaskToHalf(task: Task, half: DialHalf): List<TaskSlice> =
     }
 
 /**
+ * Slice used for the description callout on [half]: the open timer if any,
+ * otherwise the latest civil start on this face (not the first 8–9 when 12–13 exists).
+ *
+ * @since 0.4.0
+ */
+fun calloutSlice(task: Task, half: DialHalf, nowMinute: Int): TaskSlice? {
+    val slices = clipTaskToHalf(task.resolveOpenBlocks(nowMinute), half)
+    if (slices.isEmpty()) return null
+    val openStart = task.blocks.find { it.isOpen }?.startMinute
+    if (openStart != null) {
+        val clippedOpen = max(openStart.mod(TimeMath.MINUTES_PER_DAY), half.startMinute)
+        return slices.lastOrNull { it.startMinute == clippedOpen }
+            ?: slices.maxByOrNull { it.startMinute }
+    }
+    return slices.maxByOrNull { it.startMinute }
+}
+
+/**
+ * Civil slices on [half] that may still be resized. Open timers and closed
+ * past blocks are omitted. A closed first interval does not lock later ones.
+ *
+ * @since 0.4.0
+ */
+fun resizableSlices(task: Task, half: DialHalf, nowMinute: Int): List<TaskSlice> {
+    if (task.blocks.any { it.isOpen }) return emptyList()
+    return task.blocks.filterNot { it.isClosed(nowMinute) }.flatMap { block ->
+        val civilEnd = block.endMinute ?: return@flatMap emptyList()
+        unfoldTaskIntervals(block.startMinute, civilEnd).mapNotNull { (start, end) ->
+            val left = max(start, half.startMinute)
+            val right = min(end, half.endMinute)
+            if (right > left) TaskSlice(task, left, right) else null
+        }
+    }
+}
+
+/**
  * 12 o'clock anchor for [half]: now, or the nearest real task start.
  *
  * @since 0.2.0

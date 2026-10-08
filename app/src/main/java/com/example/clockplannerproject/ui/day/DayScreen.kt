@@ -1,14 +1,24 @@
 package com.example.clockplannerproject.ui.day
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,23 +38,29 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
 import com.example.clockplannerproject.kit.compose.DualTimeDial
+import com.example.clockplannerproject.kit.compose.DayTaskSummaryCard
 import com.example.clockplannerproject.kit.compose.ListDayView
 import com.example.clockplannerproject.kit.compose.TaskBottomSheet
+import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
+import com.example.clockplannerproject.ui.chrome.PaperDateHeader
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
+import com.example.clockplannerproject.ui.theme.PaperInk
+import com.example.clockplannerproject.ui.theme.TerracottaNow
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import org.koin.androidx.compose.koinViewModel
@@ -71,7 +86,10 @@ fun DayRoute(
         state = state,
         onRetry = { viewModel.onIntent(DayUiIntent.Retry) },
         onTaskClick = { viewModel.onIntent(DayUiIntent.SelectTask(it)) },
+        onListTaskClick = { viewModel.onIntent(DayUiIntent.OpenTaskDetails(it)) },
+        onOpenDetails = { viewModel.onIntent(DayUiIntent.OpenTaskDetails()) },
         onDismissTask = { viewModel.onIntent(DayUiIntent.DismissTask) },
+        onDismissDetails = { viewModel.onIntent(DayUiIntent.DismissDetails) },
         onToggleComplete = { viewModel.onIntent(DayUiIntent.ToggleComplete) },
         onEditTask = { viewModel.onIntent(DayUiIntent.EditTask) },
         onRequestDelete = { viewModel.onIntent(DayUiIntent.RequestDelete) },
@@ -91,6 +109,12 @@ fun DayRoute(
         onSetViewMode = { viewModel.onIntent(DayUiIntent.SetViewMode(it)) },
         onStartTimer = { viewModel.onIntent(DayUiIntent.StartTimer) },
         onPauseTimer = { viewModel.onIntent(DayUiIntent.PauseTimer) },
+        onPreviousDay = { viewModel.onIntent(DayUiIntent.PreviousDay) },
+        onNextDay = { viewModel.onIntent(DayUiIntent.NextDay) },
+        onOpenDatePicker = { viewModel.onIntent(DayUiIntent.OpenDatePicker) },
+        onSelectDate = { viewModel.onIntent(DayUiIntent.SelectDate(it)) },
+        onDismissDatePicker = { viewModel.onIntent(DayUiIntent.DismissDatePicker) },
+        onSetDialHalf = { viewModel.onIntent(DayUiIntent.SetDialHalf(it)) },
         onDuplicate = { viewModel.onIntent(DayUiIntent.DuplicateTask) },
         onRequestMove = { viewModel.onIntent(DayUiIntent.RequestMove) },
         onConfirmMove = { viewModel.onIntent(DayUiIntent.ConfirmMove(it)) },
@@ -105,7 +129,10 @@ fun DayScreen(
     state: DayUiState,
     onRetry: () -> Unit = {},
     onTaskClick: (Task) -> Unit = {},
+    onListTaskClick: (Task) -> Unit = {},
+    onOpenDetails: () -> Unit = {},
     onDismissTask: () -> Unit = {},
+    onDismissDetails: () -> Unit = {},
     onToggleComplete: () -> Unit = {},
     onEditTask: () -> Unit = {},
     onRequestDelete: () -> Unit = {},
@@ -121,6 +148,12 @@ fun DayScreen(
     onSetViewMode: (ViewMode) -> Unit = {},
     onStartTimer: () -> Unit = {},
     onPauseTimer: () -> Unit = {},
+    onPreviousDay: () -> Unit = {},
+    onNextDay: () -> Unit = {},
+    onOpenDatePicker: () -> Unit = {},
+    onSelectDate: (LocalDate) -> Unit = {},
+    onDismissDatePicker: () -> Unit = {},
+    onSetDialHalf: (DialHalf) -> Unit = {},
     onDuplicate: () -> Unit = {},
     onRequestMove: () -> Unit = {},
     onConfirmMove: (LocalDate) -> Unit = {},
@@ -129,7 +162,6 @@ fun DayScreen(
     modifier: Modifier = Modifier,
 ) {
     val showEmpty = !state.isLoading && state.tasks.isEmpty() && state.errorMessage == null
-    val showNowClock = TimeDialConfig.Default.clock.showCenterTime
     val canvasMode = state.viewMode != ViewMode.LIST
     val compact = state.hideCompleted && canvasMode
     val dialConfig = remember(state.userRotationOffsetDeg, compact, state.viewMode) {
@@ -154,23 +186,35 @@ fun DayScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (showNowClock) {
-                DayNowClock(now = state.now)
-            }
+            PaperDateHeader(
+                date = state.date,
+                onPrevious = onPreviousDay,
+                onNext = onNextDay,
+                onPickDate = onOpenDatePicker,
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val clockText = state.now?.let { TimeMath.formatHm(it) } ?: "—"
+                val description = stringResource(R.string.cd_current_time, clockText)
                 Text(
-                    text = stringResource(R.string.day_task_count, state.taskCount),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp, top = 2.dp, end = 8.dp, bottom = 4.dp),
+                    text = clockText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TerracottaNow,
+                    modifier = Modifier.semantics { contentDescription = description },
                 )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(
+                        if (state.dialHalf == DialHalf.PM) R.string.dial_pm else R.string.dial_am,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = PaperInk,
+                )
+                Spacer(Modifier.weight(1f))
                 if (state.hasUserRotation) {
                     val resetDescription = stringResource(R.string.cd_reset_rotation)
                     TextButton(
@@ -181,22 +225,30 @@ fun DayScreen(
                     }
                 }
                 val hideDescription = stringResource(R.string.cd_hide_completed)
-                Text(
-                    text = stringResource(R.string.day_hide_completed),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(8.dp))
-                Switch(
-                    checked = state.hideCompleted,
-                    onCheckedChange = { onToggleHideCompleted() },
+                FilterChip(
+                    selected = state.hideCompleted,
+                    onClick = onToggleHideCompleted,
+                    label = { Text(stringResource(R.string.day_hide_completed)) },
                     modifier = Modifier.semantics { contentDescription = hideDescription },
+                    shape = RoundedCornerShape(8.dp),
                 )
             }
-            ViewModeRow(
-                selected = state.viewMode,
-                onSelect = onSetViewMode,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (canvasMode) {
+                    AmPmRow(
+                        selected = state.dialHalf,
+                        onSelect = onSetDialHalf,
+                    )
+                }
+                ViewModeRow(
+                    selected = state.viewMode,
+                    onSelect = onSetViewMode,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             if (state.hideCompleted) {
                 Text(
                     text = stringResource(
@@ -234,23 +286,26 @@ fun DayScreen(
                     ListDayView(
                         tasks = state.dialTasks,
                         hideCompleted = state.hideCompleted,
-                        onTaskClick = onTaskClick,
+                        onTaskClick = onListTaskClick,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    DualTimeDial(
+                    ResponsiveDialWorkspace(
                         tasks = state.dialTasks,
                         currentTime = state.now,
                         config = dialConfig,
                         onTaskClick = onTaskClick,
                         onUserRotationDelta = onRotateBy,
-                        selectedTask = state.handleTask,
+                        selectedTask = state.overlayTask,
                         onResizePreview = onResizePreview,
                         onResizeCommit = onResizeCommit,
                         onResizeCancel = onResizeCancel,
                         onStartTimer = onStartTimer,
                         onPauseTimer = onPauseTimer,
                         onDismissSelection = onDismissTask,
+                        onOpenDetails = onOpenDetails,
+                        selectedHalf = state.dialHalf,
+                        onHalfChange = onSetDialHalf,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -266,7 +321,7 @@ fun DayScreen(
     state.sheetTask?.let { task ->
         TaskBottomSheet(
             task = task,
-            onDismiss = onDismissTask,
+            onDismiss = onDismissDetails,
             onToggleComplete = onToggleComplete,
             onEdit = onEditTask,
             onDelete = onRequestDelete,
@@ -298,6 +353,151 @@ fun DayScreen(
             onDismiss = onDismissMove,
         )
     }
+    if (state.showDatePicker && state.date != null) {
+        DayMoveDatePicker(
+            selectedDate = state.date,
+            onConfirm = onSelectDate,
+            onDismiss = onDismissDatePicker,
+        )
+    }
+}
+
+@Composable
+private fun ResponsiveDialWorkspace(
+    tasks: List<Task>,
+    currentTime: LocalTime?,
+    config: TimeDialConfig,
+    selectedTask: Task?,
+    selectedHalf: DialHalf,
+    onTaskClick: (Task) -> Unit,
+    onUserRotationDelta: (Float) -> Unit,
+    onResizePreview: (Task, Int) -> Unit,
+    onResizeCommit: (Task, Int) -> Unit,
+    onResizeCancel: () -> Unit,
+    onStartTimer: () -> Unit,
+    onPauseTimer: () -> Unit,
+    onDismissSelection: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onHalfChange: (DialHalf) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        if (maxWidth < 600.dp) {
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "dial") {
+                    DialWorkspace(
+                        tasks = tasks,
+                        currentTime = currentTime,
+                        config = config,
+                        selectedTask = selectedTask,
+                        selectedHalf = selectedHalf,
+                        onTaskClick = onTaskClick,
+                        onUserRotationDelta = onUserRotationDelta,
+                        onResizePreview = onResizePreview,
+                        onResizeCommit = onResizeCommit,
+                        onResizeCancel = onResizeCancel,
+                        onStartTimer = onStartTimer,
+                        onPauseTimer = onPauseTimer,
+                        onDismissSelection = onDismissSelection,
+                        onOpenDetails = onOpenDetails,
+                        onHalfChange = onHalfChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                    )
+                }
+                items(tasks, key = { "inventory-${it.id.value}" }) { task ->
+                    DayTaskSummaryCard(task = task, onClick = { onTaskClick(task) })
+                }
+            }
+        } else {
+            val outerMargin = if (maxWidth >= 840.dp) 32.dp else 16.dp
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = outerMargin, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .weight(1.15f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    val side = minOf(maxWidth, maxHeight)
+                    DialWorkspace(
+                        tasks = tasks,
+                        currentTime = currentTime,
+                        config = config,
+                        selectedTask = selectedTask,
+                        selectedHalf = selectedHalf,
+                        onTaskClick = onTaskClick,
+                        onUserRotationDelta = onUserRotationDelta,
+                        onResizePreview = onResizePreview,
+                        onResizeCommit = onResizeCommit,
+                        onResizeCancel = onResizeCancel,
+                        onStartTimer = onStartTimer,
+                        onPauseTimer = onPauseTimer,
+                        onDismissSelection = onDismissSelection,
+                        onOpenDetails = onOpenDetails,
+                        onHalfChange = onHalfChange,
+                        modifier = Modifier.size(side),
+                    )
+                }
+                ListDayView(
+                    tasks = tasks,
+                    hideCompleted = false,
+                    onTaskClick = onTaskClick,
+                    modifier = Modifier
+                        .weight(0.85f)
+                        .fillMaxHeight(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialWorkspace(
+    tasks: List<Task>,
+    currentTime: LocalTime?,
+    config: TimeDialConfig,
+    selectedTask: Task?,
+    selectedHalf: DialHalf,
+    onTaskClick: (Task) -> Unit,
+    onUserRotationDelta: (Float) -> Unit,
+    onResizePreview: (Task, Int) -> Unit,
+    onResizeCommit: (Task, Int) -> Unit,
+    onResizeCancel: () -> Unit,
+    onStartTimer: () -> Unit,
+    onPauseTimer: () -> Unit,
+    onDismissSelection: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onHalfChange: (DialHalf) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DualTimeDial(
+        tasks = tasks,
+        currentTime = currentTime,
+        config = config,
+        onTaskClick = onTaskClick,
+        onUserRotationDelta = onUserRotationDelta,
+        selectedTask = selectedTask,
+        onResizePreview = onResizePreview,
+        onResizeCommit = onResizeCommit,
+        onResizeCancel = onResizeCancel,
+        onStartTimer = onStartTimer,
+        onPauseTimer = onPauseTimer,
+        onDismissSelection = onDismissSelection,
+        onOpenDetails = onOpenDetails,
+        selectedHalf = selectedHalf,
+        onHalfChange = onHalfChange,
+        showHalfPills = false,
+        modifier = modifier,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -332,25 +532,6 @@ private fun DayMoveDatePicker(
     }
 }
 
-@Composable
-private fun DayNowClock(
-    now: LocalTime?,
-    modifier: Modifier = Modifier,
-) {
-    val clockText = now?.let { TimeMath.formatHm(it) } ?: "—"
-    val description = stringResource(R.string.cd_current_time, clockText)
-    Text(
-        text = clockText,
-        style = MaterialTheme.typography.headlineMedium,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp)
-            .semantics { contentDescription = description },
-    )
-}
-
 private val PreviewDate = LocalDate(2026, 10, 6)
 private val PreviewNow = LocalTime(9, 30, 0)
 
@@ -369,7 +550,12 @@ private fun DayScreenEmptyPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Full typical day")
+@Preview(
+    showBackground = true,
+    name = "Compact idle 412",
+    widthDp = 412,
+    heightDp = 892,
+)
 @Composable
 private fun DayScreenFullPreview() {
     ClockPlannerProjectTheme {
@@ -378,6 +564,95 @@ private fun DayScreenFullPreview() {
                 date = PreviewDate,
                 now = PreviewNow,
                 tasks = SampleTasks.typicalDay(PreviewDate),
+                isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    name = "Expanded idle dial",
+    widthDp = 1000,
+    heightDp = 800,
+)
+@Composable
+private fun DayScreenExpandedIdlePreview() {
+    ClockPlannerProjectTheme {
+        DayScreen(
+            state = DayUiState(
+                date = PreviewDate,
+                now = PreviewNow,
+                tasks = SampleTasks.typicalDay(PreviewDate),
+                isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    name = "Compact short selected",
+    widthDp = 360,
+    heightDp = 640,
+)
+@Composable
+private fun DayScreenCompactShortSelectedPreview() {
+    val tasks = SampleTasks.typicalDay(PreviewDate)
+    ClockPlannerProjectTheme {
+        DayScreen(
+            state = DayUiState(
+                date = PreviewDate,
+                now = LocalTime(10, 42),
+                tasks = tasks,
+                selectedTask = tasks.first { it.id.value == "work" },
+                isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    name = "Medium running",
+    widthDp = 700,
+    heightDp = 900,
+)
+@Composable
+private fun DayScreenMediumRunningPreview() {
+    val sport = SampleTasks.sportTwoBlocks(PreviewDate).copy(
+        blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, null)),
+        status = TaskStatus.IN_PROGRESS,
+    )
+    ClockPlannerProjectTheme {
+        DayScreen(
+            state = DayUiState(
+                date = PreviewDate,
+                now = LocalTime(12, 30),
+                tasks = listOf(sport),
+                selectedTask = sport,
+                dialHalf = DialHalf.PM,
+                isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    name = "Expanded list two intervals",
+    widthDp = 1000,
+    heightDp = 800,
+)
+@Composable
+private fun DayScreenExpandedListPreview() {
+    ClockPlannerProjectTheme {
+        DayScreen(
+            state = DayUiState(
+                date = PreviewDate,
+                now = PreviewNow,
+                tasks = listOf(SampleTasks.sportTwoBlocks(PreviewDate)),
+                viewMode = ViewMode.LIST,
                 isLoading = false,
             ),
         )

@@ -68,6 +68,11 @@ private class MemoryRepo(
     override fun observeTasks(date: LocalDate): Flow<List<Task>> =
         items.map { list -> list.filter { it.date == date } }
 
+    override fun observeUnscheduled(): Flow<List<Task>> =
+        items.map { list -> list.filter { it.date == null } }
+
+    override fun observeAll(): Flow<List<Task>> = items
+
     override suspend fun upsert(task: Task) {
         items.update { current -> current.filterNot { it.id == task.id } + task }
     }

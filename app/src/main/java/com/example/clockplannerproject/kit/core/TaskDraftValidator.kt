@@ -27,11 +27,7 @@ object TaskDraftValidator {
         for (block in blocks) {
             val start = block.startMinute.mod(TimeMath.MINUTES_PER_DAY)
             val endRaw = block.endMinute ?: continue
-            val end = if (endRaw == TimeMath.MINUTES_PER_DAY) {
-                TimeMath.MINUTES_PER_DAY
-            } else {
-                endRaw.mod(TimeMath.MINUTES_PER_DAY)
-            }
+            val end = endRaw.mod(TimeMath.MINUTES_PER_DAY)
             if (start == end) return TaskDraftError.EndEqualsStart
         }
         return null

@@ -18,6 +18,16 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE dateIso = :dateIso")
     fun observeByDate(dateIso: String): Flow<List<TaskWithBlocks>>
 
+    /** Emits all tasks without a scheduled date. */
+    @Transaction
+    @Query("SELECT * FROM tasks WHERE dateIso IS NULL")
+    fun observeUnscheduled(): Flow<List<TaskWithBlocks>>
+
+    /** Emits the complete task inventory. */
+    @Transaction
+    @Query("SELECT * FROM tasks")
+    fun observeAll(): Flow<List<TaskWithBlocks>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTask(entity: TaskEntity)
 

@@ -31,7 +31,7 @@ object SampleTasks {
             blocks = listOf(TimeBlock(9 * 60, 12 * 60)),
             status = TaskStatus.TODO,
             date = date,
-            tags = listOf("focus", "code"),
+            project = "focus",
         ),
         Task(
             id = TaskId("lunch"),
@@ -49,7 +49,7 @@ object SampleTasks {
             blocks = listOf(TimeBlock(18 * 60, 19 * 60 + 30)),
             status = TaskStatus.IN_PROGRESS,
             date = date,
-            tags = listOf("sport"),
+            project = "sport",
         ),
     )
 
@@ -71,7 +71,7 @@ object SampleTasks {
             TimeBlock(12 * 60, 13 * 60),
         ),
         date = date,
-        tags = listOf("sport"),
+        project = "sport",
     )
 
     fun untimedPair(date: LocalDate): List<Task> = listOf(
@@ -81,7 +81,7 @@ object SampleTasks {
             colorArgb = 0xFF80CBC4,
             date = date,
             importance = Importance.HIGH,
-            tags = listOf("admin"),
+            project = "admin",
         ),
         Task(
             id = TaskId("read"),
@@ -89,7 +89,7 @@ object SampleTasks {
             colorArgb = 0xFF90CAF9,
             date = date,
             importance = Importance.HIGH,
-            tags = listOf("learn"),
+            project = "learn",
         ),
     )
 

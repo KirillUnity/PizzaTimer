@@ -9,7 +9,7 @@ import kotlinx.datetime.LocalDate
  */
 object TaskInstances {
     /**
-     * Same [Task.id], new calendar [date]. Civil blocks and tags are kept.
+     * Same [Task.id], new calendar [date]. Project and civil blocks are kept.
      */
     fun moved(task: Task, date: LocalDate): Task = task.copy(date = date)
 
@@ -22,7 +22,7 @@ object TaskInstances {
     fun duplicated(
         task: Task,
         newId: TaskId,
-        date: LocalDate = task.date,
+        date: LocalDate? = task.date,
     ): Task = task.copy(
         id = newId,
         date = date,

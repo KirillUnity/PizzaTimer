@@ -15,7 +15,7 @@ You are a senior Android engineer (Kotlin 2, Jetpack Compose, Material 3). You p
 - Storage: Room + DataStore
 - Async: Coroutines + Flow
 - Time: **kotlinx-datetime** in `kit.core` (not `java.time` there)
-- Design: Material 3
+- Design: Material 3. Visual reference: [stitch_timedial_planner_ui_kit](stitch_timedial_planner_ui_kit) (`horological_paper_craft/DESIGN.md` + PNG). Match layout and tokens; **not** pixel-perfect. Do not copy Stitch HTML/Tailwind into Compose.
 
 ## Language
 

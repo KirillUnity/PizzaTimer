@@ -14,6 +14,12 @@ interface TaskRepository {
      */
     fun observeTasks(date: LocalDate): Flow<List<Task>>
 
+    /** Emits tasks in the undated backlog. */
+    fun observeUnscheduled(): Flow<List<Task>>
+
+    /** Emits all dated and undated tasks. */
+    fun observeAll(): Flow<List<Task>>
+
     /**
      * Inserts or replaces a task with the same [Task.id].
      */

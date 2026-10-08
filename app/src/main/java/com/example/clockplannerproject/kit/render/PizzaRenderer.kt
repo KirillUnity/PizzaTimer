@@ -51,6 +51,24 @@ object PizzaRenderer : DialRenderer {
 
     override fun DrawScope.render(state: DialDrawState) {
         renderPizzaSlices(state.sectors, state.ring)
+        state.sectors.forEach { sector ->
+            if (sector.isSelected && sector.sweepDeg > 0f) {
+                drawArc(
+                    color = state.handleColor,
+                    startAngle = sector.canvasStartDeg,
+                    sweepAngle = sector.sweepDeg,
+                    useCenter = true,
+                    topLeft = state.ring.topLeft,
+                    size = state.ring.arcSize,
+                    style = state.selectionOutline,
+                )
+            }
+        }
+        drawCircle(
+            color = state.canvasColor,
+            radius = state.ring.outerRadius * state.config.geometry.hubRadiusFraction,
+            center = state.ring.center,
+        )
         TimeDialRenderer.run {
             renderArcLabels(state.labels, state.labelPaint)
             if (state.showNowMarker) {

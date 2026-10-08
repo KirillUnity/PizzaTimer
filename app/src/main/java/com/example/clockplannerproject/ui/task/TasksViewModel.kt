@@ -3,7 +3,10 @@ package com.example.clockplannerproject.ui.task
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
+import com.example.clockplannerproject.kit.core.ReportId
+import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskReport
 import com.example.clockplannerproject.kit.core.TaskDraftValidator
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskInstances
@@ -17,6 +20,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -36,9 +40,11 @@ import java.util.UUID
 class TasksViewModel(
     private val taskRepository: TaskRepository,
     private val timeProvider: TimeProvider,
+    private val reportRepository: ReportRepository,
 ) : ViewModel() {
 
     private val selectedDate = MutableStateFlow(timeProvider.today())
+    private val editorTaskId = MutableStateFlow<TaskId?>(null)
 
     private val _state = MutableStateFlow(
         TasksUiState(
@@ -55,23 +61,39 @@ class TasksViewModel(
 
     init {
         observeSelectedDate()
+        observeEditorReports()
     }
 
     fun onIntent(intent: TasksUiIntent) {
         when (intent) {
             TasksUiIntent.Create -> openCreate()
-            is TasksUiIntent.Edit -> _state.update {
-                it.copy(
-                    editor = TaskEditorState.from(intent.task),
-                    timePicker = null,
-                    nowMinute = minuteOfNow(),
-                )
+            TasksUiIntent.CreateForSelectedDay -> openCreate(scheduled = true)
+            is TasksUiIntent.Edit -> {
+                editorTaskId.value = intent.task.id
+                _state.update {
+                    it.copy(
+                        editor = TaskEditorState.from(intent.task),
+                        timePicker = null,
+                        nowMinute = minuteOfNow(),
+                        reportDraft = "",
+                        editingReportId = null,
+                    )
+                }
             }
             TasksUiIntent.Update -> save()
             is TasksUiIntent.Delete -> _state.update { it.copy(pendingDelete = intent.task) }
             TasksUiIntent.ConfirmDelete -> confirmDelete()
-            TasksUiIntent.DismissEditor -> _state.update {
-                it.copy(editor = null, timePicker = null)
+            TasksUiIntent.DismissEditor -> {
+                editorTaskId.value = null
+                _state.update {
+                    it.copy(
+                        editor = null,
+                        timePicker = null,
+                        reports = emptyList(),
+                        reportDraft = "",
+                        editingReportId = null,
+                    )
+                }
             }
             TasksUiIntent.DismissDelete -> _state.update { it.copy(pendingDelete = null) }
             TasksUiIntent.PreviousDay -> shiftDate(-1)
@@ -99,12 +121,26 @@ class TasksViewModel(
             }
             is TasksUiIntent.ChangeStatus -> updateEditor { it.copy(status = intent.status) }
             is TasksUiIntent.ChangeImportance -> updateEditor { it.copy(importance = intent.importance) }
-            is TasksUiIntent.ChangeTagDraft -> updateEditor { it.copy(tagDraft = intent.value) }
-            TasksUiIntent.AddTag -> addTag()
-            is TasksUiIntent.RemoveTag -> updateEditor {
-                it.copy(tags = it.tags.filterNot { tag -> tag == intent.tag })
+            is TasksUiIntent.ChangeProject -> updateEditor { it.copy(project = intent.value) }
+            is TasksUiIntent.FilterByProject -> _state.update {
+                it.copy(selectedProject = intent.project)
             }
-            is TasksUiIntent.FilterByTag -> _state.update { it.copy(tagFilter = intent.tag) }
+            is TasksUiIntent.ChangeProjectSearch -> _state.update {
+                it.copy(projectSearch = intent.query)
+            }
+            TasksUiIntent.ClearProjectSearch -> _state.update { it.copy(projectSearch = "") }
+            is TasksUiIntent.ChangeScheduled -> updateEditor { editor ->
+                if (intent.scheduled) {
+                    editor.copy(scheduledDate = _state.value.date)
+                } else {
+                    editor.copy(
+                        scheduledDate = null,
+                        blocks = emptyList(),
+                        recurrence = com.example.clockplannerproject.kit.core.RecurrenceRule.None,
+                    )
+                }
+            }
+            is TasksUiIntent.MoveToDiagram -> moveToDiagram(intent.task)
             is TasksUiIntent.OpenStartPicker -> _state.update {
                 it.copy(timePicker = TimePickerTarget(intent.index, isStart = true), nowMinute = minuteOfNow())
             }
@@ -117,6 +153,53 @@ class TasksViewModel(
             TasksUiIntent.DismissMove -> _state.update { it.copy(pendingMove = null) }
             is TasksUiIntent.ConfirmMove -> confirmMove(intent.date)
             is TasksUiIntent.ChangeRecurrence -> updateEditor { it.copy(recurrence = intent.rule) }
+            is TasksUiIntent.ChangeReportDraft -> _state.update { it.copy(reportDraft = intent.text) }
+            is TasksUiIntent.EditReport -> _state.update {
+                it.copy(editingReportId = intent.report.id, reportDraft = intent.report.text)
+            }
+            TasksUiIntent.SaveReport -> saveReport()
+            is TasksUiIntent.DeleteReport -> viewModelScope.launch {
+                reportRepository.delete(intent.id)
+            }
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeEditorReports() {
+        viewModelScope.launch {
+            editorTaskId.filterNotNull()
+                .flatMapLatest { id -> reportRepository.observeReports(id) }
+                .collect { reports ->
+                    _state.update { it.copy(reports = reports) }
+                }
+        }
+    }
+
+    private fun saveReport() {
+        val editor = _state.value.editor ?: return
+        val taskId = editor.id ?: return
+        val text = _state.value.reportDraft.trim()
+        if (text.isEmpty()) return
+        val existingId = _state.value.editingReportId
+        val created = _state.value.reports.find { it.id == existingId }?.createdAtEpochMillis
+            ?: System.currentTimeMillis()
+        val report = TaskReport(
+            id = existingId ?: ReportId(UUID.randomUUID().toString()),
+            taskId = taskId,
+            createdAtEpochMillis = created,
+            text = text,
+        )
+        viewModelScope.launch {
+            try {
+                reportRepository.upsert(report)
+                _state.update { it.copy(reportDraft = "", editingReportId = null) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    TasksUiEffect.ShowMessage(error.message ?: "Could not save note"),
+                )
+            }
         }
     }
 
@@ -124,16 +207,15 @@ class TasksViewModel(
     private fun observeSelectedDate() {
         viewModelScope.launch {
             try {
-                selectedDate
-                    .flatMapLatest { date ->
-                        materializer.ensureVisibleDay(date)
-                        taskRepository.observeTasks(date).map { tasks -> date to tasks }
-                    }
+                selectedDate.flatMapLatest { date ->
+                    materializer.ensureVisibleDay(date)
+                    taskRepository.observeAll().map { tasks -> date to tasks }
+                }
                     .collect { (date, tasks) ->
                         _state.update { current ->
                             current.copy(
                                 date = date,
-                                tasks = tasks.sortedBy { it.sortMinute },
+                                tasks = tasks,
                                 isLoading = false,
                                 errorMessage = null,
                                 nowMinute = minuteOfNow(),
@@ -156,16 +238,13 @@ class TasksViewModel(
         }
     }
 
-    private fun openCreate() {
-        val start = minuteOfNow().mod(TimeMath.MINUTES_PER_DAY)
-        val end = (start + 60).mod(TimeMath.MINUTES_PER_DAY)
+    private fun openCreate(scheduled: Boolean = false) {
+        editorTaskId.value = null
         _state.update {
             it.copy(
-                editor = TaskEditorState(
-                    blocks = listOf(TimeBlock(start, if (end == start) (start + 60).mod(TimeMath.MINUTES_PER_DAY) else end)),
-                ),
+                editor = TaskEditorState(scheduledDate = if (scheduled) it.date else null),
                 timePicker = null,
-                nowMinute = start,
+                nowMinute = minuteOfNow(),
             )
         }
     }
@@ -173,7 +252,6 @@ class TasksViewModel(
     private fun save() {
         val snapshot = _state.value
         val editor = snapshot.editor ?: return
-        val date = snapshot.date ?: return
         val error = TaskDraftValidator.validate(title = editor.title, blocks = editor.blocks)
         if (error != null) {
             _state.update { it.copy(editor = editor.copy(error = error)) }
@@ -181,7 +259,7 @@ class TasksViewModel(
         }
         viewModelScope.launch {
             try {
-                taskRepository.upsert(editor.toTask(date))
+                taskRepository.upsert(editor.toTask())
                 _state.update { it.copy(editor = null, timePicker = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -225,7 +303,7 @@ class TasksViewModel(
                 pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
-                tagFilter = null,
+                selectedProject = null,
             )
         }
     }
@@ -240,7 +318,7 @@ class TasksViewModel(
                 pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
-                tagFilter = null,
+                selectedProject = null,
             )
         }
     }
@@ -249,7 +327,7 @@ class TasksViewModel(
         val copy = TaskInstances.duplicated(
             task,
             TaskId(UUID.randomUUID().toString()),
-            _state.value.date ?: task.date,
+            task.date,
         )
         viewModelScope.launch {
             try {
@@ -315,13 +393,23 @@ class TasksViewModel(
         }
     }
 
-    private fun addTag() {
-        updateEditor { editor ->
-            val tag = editor.tagDraft.trim()
-            if (tag.isEmpty() || tag in editor.tags) {
-                editor.copy(tagDraft = "")
-            } else {
-                editor.copy(tags = editor.tags + tag, tagDraft = "")
+    private fun moveToDiagram(task: Task) {
+        val date = _state.value.date ?: return
+        viewModelScope.launch {
+            try {
+                taskRepository.upsert(
+                    task.copy(
+                        date = date,
+                        blocks = emptyList(),
+                        recurrence = com.example.clockplannerproject.kit.core.RecurrenceRule.None,
+                    ),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                effects.send(
+                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task to diagram"),
+                )
             }
         }
     }

@@ -8,9 +8,8 @@ import androidx.room.RoomDatabase
 /**
  * Local TimeDial database.
  *
- * Schema v3:
- * `tasks(..., recurrenceKind TEXT, weekdaysMask INTEGER, seriesId TEXT)`
- * `time_blocks(..., endMinute INTEGER nullable for open timer)`
+ * Schema v5:
+ * `tasks(...)`, `time_blocks(...)`, `task_reports(id, taskId, createdAtEpochMillis, text)`
  *
  * **No Room `Migration` class.** Version bumps use
  * [fallbackToDestructiveMigration] only. Installing an app update that
@@ -20,12 +19,13 @@ import androidx.room.RoomDatabase
  * @since 0.1.0
  */
 @Database(
-    entities = [TaskEntity::class, TimeBlockEntity::class],
-    version = 3,
+    entities = [TaskEntity::class, TimeBlockEntity::class, TaskReportEntity::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class TimeDialDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
+    abstract fun reportDao(): ReportDao
 
     companion object {
         fun create(context: Context): TimeDialDatabase =
@@ -34,7 +34,7 @@ abstract class TimeDialDatabase : RoomDatabase() {
                 TimeDialDatabase::class.java,
                 "timedial.db",
             )
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigration()
                 .build()
     }
 }

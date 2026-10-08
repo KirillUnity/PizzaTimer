@@ -15,7 +15,7 @@ import org.junit.Test
 class TaskMappersTest {
 
     @Test
-    fun mapper_roundTrip_preservesBlocksTagsImportance() {
+    fun mapper_roundTrip_preservesBlocksProjectImportance() {
         val original = Task(
             id = TaskId("task-2"),
             title = "Gym",
@@ -28,7 +28,7 @@ class TaskMappersTest {
             status = TaskStatus.IN_PROGRESS,
             date = LocalDate(2026, 10, 6),
             importance = Importance.HIGH,
-            tags = listOf("sport", "health"),
+            project = "sport",
             recurrence = RecurrenceRule.Weekdays(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)),
             seriesId = "task-2",
         )
@@ -48,5 +48,19 @@ class TaskMappersTest {
         val restored = original.toEntity().toDomain(original.toBlockEntities())
         assertEquals(original, restored)
         assertTrue(restored.isUntimed)
+    }
+
+    @Test
+    fun mapper_backlog_preservesNullDateAndNormalizesProject() {
+        val original = Task(
+            id = TaskId("backlog"),
+            title = "Idea",
+            colorArgb = 0xFF80CBC4,
+            date = null,
+            project = "  Research  ",
+        )
+        val restored = original.toEntity().toDomain(emptyList())
+        assertEquals(null, restored.date)
+        assertEquals("Research", restored.project)
     }
 }

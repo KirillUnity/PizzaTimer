@@ -6,7 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,15 +18,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
@@ -32,7 +34,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -72,12 +73,12 @@ import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
+import com.example.clockplannerproject.ui.chrome.PaperDateHeader
+import com.example.clockplannerproject.ui.stats.ReportCard
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
+import com.example.clockplannerproject.ui.theme.PaperOutline
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.toJavaLocalDate
 import org.koin.androidx.compose.koinViewModel
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 @Composable
 fun TasksRoute(
@@ -135,19 +136,22 @@ fun TasksScreen(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            DateHeader(
+            PaperDateHeader(
                 date = state.date,
                 onPrevious = { onIntent(TasksUiIntent.PreviousDay) },
                 onNext = { onIntent(TasksUiIntent.NextDay) },
                 onPickDate = { onIntent(TasksUiIntent.OpenDatePicker) },
+                title = stringResource(R.string.nav_tasks),
+                subtitle = null,
             )
-            if (state.availableTags.isNotEmpty()) {
-                TagFilterRow(
-                    tags = state.availableTags,
-                    selected = state.tagFilter,
-                    onSelect = { onIntent(TasksUiIntent.FilterByTag(it)) },
-                )
-            }
+            ProjectControls(
+                projects = state.availableProjects,
+                selected = state.selectedProject,
+                search = state.projectSearch,
+                onSearch = { onIntent(TasksUiIntent.ChangeProjectSearch(it)) },
+                onClearSearch = { onIntent(TasksUiIntent.ClearProjectSearch) },
+                onSelect = { onIntent(TasksUiIntent.FilterByProject(it)) },
+            )
             state.errorMessage?.let { message ->
                 Text(
                     text = message,
@@ -169,18 +173,17 @@ fun TasksScreen(
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(state.visibleTasks, key = { it.id.value }) { task ->
-                        TaskListRow(
-                            task = task,
-                            onEdit = { onIntent(TasksUiIntent.Edit(task)) },
-                            onDelete = { onIntent(TasksUiIntent.Delete(task)) },
-                            onDuplicate = { onIntent(TasksUiIntent.Duplicate(task)) },
-                            onMove = { onIntent(TasksUiIntent.RequestMove(task)) },
-                        )
-                    }
-                    item { Spacer(Modifier.height(24.dp)) }
-                }
+                ResponsiveTaskGrid(
+                    tasks = state.visibleTasks,
+                    onEdit = { onIntent(TasksUiIntent.Edit(it)) },
+                    onDelete = { onIntent(TasksUiIntent.Delete(it)) },
+                    onDuplicate = { onIntent(TasksUiIntent.Duplicate(it)) },
+                    onMove = {
+                        if (it.date == null) onIntent(TasksUiIntent.MoveToDiagram(it))
+                        else onIntent(TasksUiIntent.RequestMove(it))
+                    },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         SnackbarHost(
@@ -195,54 +198,42 @@ fun TasksScreen(
 }
 
 @Composable
-private fun DateHeader(
-    date: LocalDate?,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onPickDate: () -> Unit,
+private fun ResponsiveTaskGrid(
+    tasks: List<Task>,
+    onEdit: (Task) -> Unit,
+    onDelete: (Task) -> Unit,
+    onDuplicate: (Task) -> Unit,
+    onMove: (Task) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val label = if (date == null) {
-        stringResource(R.string.tasks_date_loading)
-    } else {
-        remember(date) {
-            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-                .format(date.toJavaLocalDate())
-        }
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        IconButton(onClick = onPrevious, enabled = date != null) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.cd_previous_day),
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val columns = if (maxWidth >= 600.dp) 2 else 1
+        val horizontalPadding = if (maxWidth >= 840.dp) 32.dp else 16.dp
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            contentPadding = PaddingValues(
+                start = horizontalPadding,
+                top = 8.dp,
+                end = horizontalPadding,
+                bottom = 96.dp,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = label, style = MaterialTheme.typography.titleMedium)
-            IconButton(onClick = onPickDate, enabled = date != null) {
-                Icon(
-                    imageVector = Icons.Filled.DateRange,
-                    contentDescription = stringResource(R.string.cd_pick_date),
+            items(tasks, key = { it.id.value }) { task ->
+                TaskListRow(
+                    task = task,
+                    onEdit = { onEdit(task) },
+                    onDelete = { onDelete(task) },
+                    onDuplicate = { onDuplicate(task) },
+                    onMove = { onMove(task) },
                 )
             }
-        }
-        IconButton(onClick = onNext, enabled = date != null) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.cd_next_day),
-            )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskListRow(
     task: Task,
@@ -252,46 +243,99 @@ private fun TaskListRow(
     onMove: () -> Unit = {},
 ) {
     val colorCd = stringResource(R.string.cd_task_color, task.title)
-    ListItem(
-        headlineContent = { Text(task.title) },
-        supportingContent = {
-            val schedule = if (task.isUntimed) {
-                stringResource(R.string.task_untimed)
-            } else {
-                TimeMath.formatBlocks(task.blocks)
-            }
-            val tags = if (task.tags.isEmpty()) "" else " · ${task.tags.joinToString()}"
-            Text(
-                text = "$schedule · ${stringResource(statusLabel(task.status))}$tags",
-            )
-        },
-        leadingContent = {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, PaperOutline, shape)
+            .clickable(onClick = onEdit)
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
+                    .size(width = 4.dp, height = 36.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
                     .background(Color(task.colorArgb.toInt()))
                     .semantics { contentDescription = colorCd },
             )
-        },
-        trailingContent = {
-            Row {
-                TextButton(onClick = onMove) {
-                    Text(stringResource(R.string.task_move))
-                }
-                TextButton(onClick = onDuplicate) {
-                    Text(stringResource(R.string.task_duplicate))
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.cd_delete_task, task.title),
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+            ) {
+                Text(text = task.title, style = MaterialTheme.typography.titleMedium)
+                if (task.date == null) {
+                    Text(
+                        text = stringResource(R.string.task_backlog),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                } else if (task.isUntimed) {
+                    Text(
+                        text = stringResource(R.string.task_untimed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    task.blocks.forEach { block ->
+                        Text(
+                            text = TimeMath.formatRange(block.startMinute, block.endMinute),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
-        },
-        modifier = Modifier.clickable(onClick = onEdit),
-    )
+        }
+        FlowRow(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            InputChip(
+                selected = false,
+                onClick = {},
+                label = { Text(stringResource(statusLabel(task.status))) },
+            )
+            InputChip(
+                selected = false,
+                onClick = {},
+                label = { Text(stringResource(importanceLabel(task.importance))) },
+            )
+            task.normalizedProject?.let { project ->
+                InputChip(
+                    selected = false,
+                    onClick = {},
+                    label = { Text(project) },
+                )
+            }
+        }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TextButton(onClick = onMove) {
+                Text(
+                    stringResource(
+                        if (task.date == null) R.string.task_move_to_diagram else R.string.task_move,
+                    ),
+                )
+            }
+            TextButton(onClick = onDuplicate) {
+                Text(stringResource(R.string.task_duplicate))
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.cd_delete_task, task.title),
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -313,6 +357,8 @@ fun TaskEditorOverlays(
                 editor = editor,
                 date = date,
                 nowMinute = state.nowMinute,
+                reports = state.reports,
+                reportDraft = state.reportDraft,
                 onIntent = onIntent,
             )
         }
@@ -373,7 +419,7 @@ fun TaskEditorOverlays(
 
     state.pendingMove?.let { moving ->
         TaskDatePickerDialog(
-            selectedDate = moving.date,
+            selectedDate = moving.date ?: state.date ?: return@let,
             onConfirm = { onIntent(TasksUiIntent.ConfirmMove(it)) },
             onDismiss = { onIntent(TasksUiIntent.DismissMove) },
         )
@@ -422,6 +468,8 @@ private fun TaskEditorSheet(
     editor: TaskEditorState,
     date: LocalDate,
     nowMinute: Int,
+    reports: List<com.example.clockplannerproject.kit.core.TaskReport> = emptyList(),
+    reportDraft: String = "",
     onIntent: (TasksUiIntent) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -504,18 +552,28 @@ private fun TaskEditorSheet(
                 onSelect = { onIntent(TasksUiIntent.ChangeImportance(it)) },
             )
             Spacer(Modifier.height(12.dp))
-            TagEditorRow(
-                tags = editor.tags,
-                draft = editor.tagDraft,
-                onDraft = { onIntent(TasksUiIntent.ChangeTagDraft(it)) },
-                onAdd = { onIntent(TasksUiIntent.AddTag) },
-                onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
+            OutlinedTextField(
+                value = editor.project,
+                onValueChange = { onIntent(TasksUiIntent.ChangeProject(it)) },
+                label = { Text(stringResource(R.string.task_project)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
-            RecurrenceEditor(
-                rule = editor.recurrence,
-                onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+            FilterChip(
+                selected = editor.scheduledDate == null,
+                onClick = {
+                    onIntent(TasksUiIntent.ChangeScheduled(editor.scheduledDate == null))
+                },
+                label = { Text(stringResource(R.string.task_backlog_toggle)) },
             )
+            if (editor.scheduledDate != null) {
+                Spacer(Modifier.height(12.dp))
+                RecurrenceEditor(
+                    rule = editor.recurrence,
+                    onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+                )
+            }
             Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.task_intervals),
@@ -577,6 +635,31 @@ private fun TaskEditorSheet(
                     )
                 }
             }
+            if (!editor.isNew) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.task_reports),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = reportDraft,
+                    onValueChange = { onIntent(TasksUiIntent.ChangeReportDraft(it)) },
+                    label = { Text(stringResource(R.string.report_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                TextButton(onClick = { onIntent(TasksUiIntent.SaveReport) }) {
+                    Text(stringResource(R.string.report_save))
+                }
+                reports.forEach { report ->
+                    ReportCard(
+                        report = report,
+                        onClick = { onIntent(TasksUiIntent.EditReport(report)) },
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -584,7 +667,7 @@ private fun TaskEditorSheet(
             ) {
                 if (!editor.isNew) {
                     TextButton(
-                        onClick = { onIntent(TasksUiIntent.Delete(editor.toTask(date))) },
+                        onClick = { onIntent(TasksUiIntent.Delete(editor.toTask())) },
                     ) {
                         Text(stringResource(R.string.task_delete))
                     }
@@ -631,28 +714,48 @@ private fun ClockTimePickerDialog(
 }
 
 @Composable
-private fun TagFilterRow(
-    tags: List<String>,
+private fun ProjectControls(
+    projects: List<String>,
     selected: String?,
+    search: String,
+    onSearch: (String) -> Unit,
+    onClearSearch: () -> Unit,
     onSelect: (String?) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(
-            selected = selected == null,
-            onClick = { onSelect(null) },
-            label = { Text(stringResource(R.string.task_tags_all)) },
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        OutlinedTextField(
+            value = search,
+            onValueChange = onSearch,
+            label = { Text(stringResource(R.string.task_project_search)) },
+            singleLine = true,
+            trailingIcon = {
+                if (search.isNotEmpty()) {
+                    TextButton(
+                        onClick = onClearSearch,
+                        modifier = Modifier.height(48.dp),
+                    ) {
+                        Text(stringResource(R.string.task_project_search_clear))
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
         )
-        tags.forEach { tag ->
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             FilterChip(
-                selected = selected == tag,
-                onClick = { onSelect(if (selected == tag) null else tag) },
-                label = { Text(tag) },
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                label = { Text(stringResource(R.string.task_projects_all)) },
             )
+            projects.forEach { project ->
+                FilterChip(
+                    selected = selected.equals(project, ignoreCase = true),
+                    onClick = { onSelect(if (selected.equals(project, true)) null else project) },
+                    label = { Text(project) },
+                )
+            }
         }
     }
 }
@@ -679,46 +782,6 @@ private fun ImportanceRow(
             )
         }
     }
-}
-
-@Composable
-private fun TagEditorRow(
-    tags: List<String>,
-    draft: String,
-    onDraft: (String) -> Unit,
-    onAdd: () -> Unit,
-    onRemove: (String) -> Unit,
-) {
-    Text(
-        text = stringResource(R.string.task_tags),
-        style = MaterialTheme.typography.labelLarge,
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tags.forEach { tag ->
-            InputChip(
-                selected = false,
-                onClick = { onRemove(tag) },
-                label = { Text(tag) },
-            )
-        }
-    }
-    OutlinedTextField(
-        value = draft,
-        onValueChange = onDraft,
-        label = { Text(stringResource(R.string.task_tag_add)) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        trailingIcon = {
-            TextButton(onClick = onAdd) {
-                Text(stringResource(R.string.task_tag_confirm))
-            }
-        },
-    )
 }
 
 @Composable
@@ -852,7 +915,7 @@ private fun statusLabel(status: TaskStatus): Int = when (status) {
 
 private val PreviewDate = LocalDate(2026, 10, 6)
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Tasks compact short", widthDp = 360, heightDp = 640)
 @Composable
 private fun TasksScreenPreview() {
     ClockPlannerProjectTheme {
@@ -860,6 +923,21 @@ private fun TasksScreenPreview() {
             state = TasksUiState(
                 date = PreviewDate,
                 tasks = SampleTasks.typicalDay(PreviewDate),
+                isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Tasks medium grid", widthDp = 700, heightDp = 900)
+@Composable
+private fun TasksScreenMediumPreview() {
+    ClockPlannerProjectTheme {
+        TasksScreen(
+            state = TasksUiState(
+                date = PreviewDate,
+                tasks = SampleTasks.typicalDay(PreviewDate) +
+                    SampleTasks.sportTwoBlocks(PreviewDate),
                 isLoading = false,
             ),
         )

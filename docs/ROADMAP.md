@@ -32,8 +32,8 @@ flowchart TB
     J[Старт_Пауза]
   end
   subgraph week5 [Неделя5_v0.5]
-    K[Отчёты_и_медиа]
-    L[Статистика_экспорт]
+    K[Дизайн_Stitch_и_chrome]
+    L[Отчёт_текст]
   end
   subgraph week6 [Неделя6_v1.0_android]
     M[Подложки_настройки]
@@ -61,7 +61,7 @@ flowchart TB
 | Теги | Неделя 3 |
 | Перенос, дубликат, daily/weekdays | Неделя 4 |
 | Старт/Пауза в центре, append-only | Неделя 4 |
-| Отчёты с текстом и медиа | Неделя 5, файлы в app storage |
+| Отчёты с текстом и медиа | Текст неделя 5 (Stitch UI); медиа filesDir неделя 6 |
 | Подложки и настройки вида | Неделя 6 |
 | «Сейчас» сверху | Неделя 1: сцена, не мутация времён |
 
@@ -110,7 +110,7 @@ com.example.clockplannerproject
   ui.day            экран дня + MVI + таймер в центре
   ui.task           список / редактор / теги / повтор
   ui.settings       внешний вид (неделя 6)
-  ui.stats          отчёты и статистика (неделя 5)
+  ui.stats          отчёты: текст неделя 5, медиа неделя 6
   ui.theme          Material 3
 ```
 
@@ -124,8 +124,8 @@ com.example.clockplannerproject
 | 2 | v0.2 | Интерактивность | CRUD; sheet; поворот; resize; hide completed reflow; DONE серым |
 | 3 | v0.3 | Гибкое время + теги | Несколько `TimeBlock`; untimed заполняют leftover; веса 5:3:2; теги; timed+untimed на DIAL/PIZZA; wipe DB |
 | 4 | v0.4 | Экземпляры и таймер | Перенос дня, дубликат, daily/weekdays; тап поднимает сектор + облако; Start/Pause; append-only |
-| 5 | v0.5 | Отчёты | Текст + медиа на задачу; список отчётов; статистика/экспорт вторично |
-| 6 | v1.0-android | Оболочка | Подложки, DataStore настроек, онбординг, ru/en, TalkBack, Play-чеклист |
+| 5 | v0.5 | Дизайн + тонкий отчёт | Тема Horological Paper Craft (Stitch); chrome Дня; визуал DIAL/PIZZA/PETALS/LIST и Tasks (не pixel-perfect); TaskReport только текст. Медиа и PNG-export не входят |
+| 6 | v1.0-android | Оболочка | Медиа отчётов в filesDir; подложки, DataStore, онбординг, ru/en, TalkBack, Play-чеклист |
 
 ### Риски
 
@@ -145,7 +145,7 @@ com.example.clockplannerproject
 1. Прочитать этот файл и [AGENTS.md](../AGENTS.md).
 2. На каждый день копировать промпт из [DAILY_PROMPTS.md](DAILY_PROMPTS.md) в Cursor Agent.
 3. Не смешивать цели двух дней в одном чате, если агент начинает расползаться.
-4. День 7 / 14 / 21 / 28 / 35 / 42 — только полировка, тесты, тег версии (`v0.1` … `v1.0-android`).
+4. День 7 / 14 / 21 / 28 / 35 / 43 — только полировка, тесты, тег версии (`v0.1` … `v1.0-android`).
 
 ---
 
@@ -174,8 +174,8 @@ flowchart TB
     J[Start_Pause]
   end
   subgraph week5 [Week5_v0.5]
-    K[Reports_and_media]
-    L[Stats_export]
+    K[Stitch_design_and_chrome]
+    L[Report_text]
   end
   subgraph week6 [Week6_v1.0_android]
     M[Backgrounds_settings]
@@ -203,7 +203,7 @@ Original intent: the day plan is a **clock face**, not a list. Week 3+ add flexi
 | Tags | Week 3 |
 | Move, duplicate, daily/weekdays | Week 4 |
 | Center Start/Pause, append-only | Week 4 |
-| Reports with text and media | Week 5, app storage |
+| Reports with text and media | Text in week 5 (Stitch UI); media in app filesDir in week 6 |
 | Backgrounds and appearance settings | Week 6 |
 | Now at the top | Week 1: scene rotation, do not mutate times |
 
@@ -252,8 +252,8 @@ Same tree as in the Russian section. `kit.render` must not know Room or screens.
 | 2 | v0.2 | Interactivity | CRUD; sheet; rotate; resize; hide-completed reflow; gray DONE |
 | 3 | v0.3 | Flexible time + tags | Multiple `TimeBlock`s; untimed fill leftover; weights 5:3:2; tags; timed+untimed on DIAL/PIZZA; wipe DB |
 | 4 | v0.4 | Instances and timer | Move day, duplicate, daily/weekdays; tap raises sector + cloud; Start/Pause; append-only |
-| 5 | v0.5 | Reports | Text + media on a task; report list; stats/export secondary |
-| 6 | v1.0-android | Shell | Backgrounds, DataStore settings, onboarding, ru/en, TalkBack, Play checklist |
+| 5 | v0.5 | Design + thin report | Horological Paper Craft from Stitch; Day chrome; DIAL/PIZZA/PETALS/LIST + Tasks visuals (not pixel-perfect); TaskReport text only. No media or PNG export |
+| 6 | v1.0-android | Shell | Report media in filesDir; backgrounds, DataStore, onboarding, ru/en, TalkBack, Play checklist |
 
 ### Risks
 
@@ -273,4 +273,4 @@ Same tree as in the Russian section. `kit.render` must not know Room or screens.
 1. Read this file and [AGENTS.md](../AGENTS.md).
 2. Each day, paste the prompt from [DAILY_PROMPTS.md](DAILY_PROMPTS.md) into Cursor Agent.
 3. Do not mix two days in one chat if the agent starts expanding scope.
-4. Days 7 / 14 / 21 / 28 / 35 / 42 are polish, tests, and a version tag (`v0.1` … `v1.0-android`).
+4. Days 7 / 14 / 21 / 28 / 35 / 43 are polish, tests, and a version tag (`v0.1` … `v1.0-android`).

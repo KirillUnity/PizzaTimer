@@ -27,13 +27,15 @@ data class TimeDialConfig(
  * @since 0.1.0
  */
 data class ColorConfig(
-    val trackArgb: Long = 0x00000000,
-    val completedArgb: Long = 0xFFC5BDB3,
-    val labelArgb: Long = 0xFF1C1B1F,
-    val nowMarkerArgb: Long = 0xFFE07A5F,
-    val handleArgb: Long = 0xFF5C5346,
-    val restArgb: Long = 0xFFD9CBB8,
-    val focusArgb: Long = 0xFFC4A484,
+    val trackArgb: Long = 0x00FFFFFF,
+    /** Paper canvas; pizza/petals hub uses this so Start/Pause sits in a hole. */
+    val canvasArgb: Long = 0xFFFBF9F5,
+    val completedArgb: Long = 0xFF8E8B82,
+    val labelArgb: Long = 0xFF1C1B18,
+    val nowMarkerArgb: Long = 0xFFE0533C,
+    val handleArgb: Long = 0xFF1C1B18,
+    val restArgb: Long = 0xFFEADBCE,
+    val focusArgb: Long = 0xFFE0533C,
 ) {
     companion object {
         val Default: ColorConfig = ColorConfig()
@@ -56,6 +58,7 @@ data class GeometryConfig(
     val chevronSpreadDeg: Float = CHEVRON_SPREAD_DEG,
     val chevronLengthFraction: Float = CHEVRON_LENGTH_FRACTION,
     val pizzaLabelRadiusFraction: Float = PIZZA_LABEL_RADIUS_FRACTION,
+    val hubRadiusFraction: Float = HUB_RADIUS_FRACTION,
     val petalBaseFraction: Float = PETAL_BASE_FRACTION,
     val petalMinLengthFraction: Float = PETAL_MIN_LENGTH_FRACTION,
     val petalMaxLengthFraction: Float = PETAL_MAX_LENGTH_FRACTION,
@@ -71,6 +74,7 @@ data class GeometryConfig(
         const val CHEVRON_SPREAD_DEG: Float = 10f
         const val CHEVRON_LENGTH_FRACTION: Float = 0.07f
         const val PIZZA_LABEL_RADIUS_FRACTION: Float = 0.55f
+        const val HUB_RADIUS_FRACTION: Float = 0.18f
         const val PETAL_BASE_FRACTION: Float = 0.12f
         const val PETAL_MIN_LENGTH_FRACTION: Float = 0.42f
         const val PETAL_MAX_LENGTH_FRACTION: Float = 0.96f
@@ -88,8 +92,8 @@ data class GeometryConfig(
 data class ClockConfig(
     val snapToNow: Boolean = true,
     val showNowMarker: Boolean = true,
-    /** Digital clock in the day header, above the ring (not in the hole). */
-    val showCenterTime: Boolean = true,
+    /** Legacy header clock. LIVE CHRONO lives in the ring hole (v0.5). */
+    val showCenterTime: Boolean = false,
     val reflowMode: ReflowMode = ReflowMode.WallClock,
 ) {
     companion object {

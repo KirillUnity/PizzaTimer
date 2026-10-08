@@ -1,5 +1,6 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.ViewMode
@@ -21,6 +22,8 @@ data class DayUiState(
     val now: LocalTime? = null,
     val tasks: List<Task> = emptyList(),
     val selectedTask: Task? = null,
+    /** When true, [sheetTask] is shown; canvas tap only sets [selectedTask]. */
+    val detailsOpen: Boolean = false,
     val pendingDelete: Task? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
@@ -31,6 +34,8 @@ data class DayUiState(
     val hideCompleted: Boolean = false,
     val viewMode: ViewMode = ViewMode.DIAL,
     val showMovePicker: Boolean = false,
+    val showDatePicker: Boolean = false,
+    val dialHalf: DialHalf = DialHalf.AM,
 ) : UiState {
     val taskCount: Int get() = tasks.size
     val hasUserRotation: Boolean get() = kotlin.math.abs(userRotationOffsetDeg) > 0.5f
@@ -41,9 +46,13 @@ data class DayUiState(
             resizePreviewEndMinute,
             resizeBlockStartMinute,
         )
-    val sheetTask: Task?
+    val overlayTask: Task?
         get() {
-            val selected = selectedTask ?: return null
+            val selected = selectedTask ?: run {
+                val id = resizingTaskId ?: return null
+                val end = resizePreviewEndMinute ?: return null
+                return tasks.find { it.id == id }?.withEndMinute(end, resizeBlockStartMinute)
+            }
             val preview = resizePreviewEndMinute
             return if (selected.id == resizingTaskId && preview != null) {
                 selected.withEndMinute(preview, resizeBlockStartMinute)
@@ -51,18 +60,19 @@ data class DayUiState(
                 selected
             }
         }
-    val handleTask: Task?
+    val sheetTask: Task?
         get() {
-            sheetTask?.let { return it }
-            val id = resizingTaskId ?: return null
-            val end = resizePreviewEndMinute ?: return null
-            return tasks.find { it.id == id }?.withEndMinute(end, resizeBlockStartMinute)
+            if (!detailsOpen) return null
+            return overlayTask
         }
 }
 
 sealed interface DayUiIntent : UiIntent {
     data object Retry : DayUiIntent
     data class SelectTask(val task: Task) : DayUiIntent
+    /** Full card (sheet). Does not run on canvas tap. */
+    data class OpenTaskDetails(val task: Task? = null) : DayUiIntent
+    data object DismissDetails : DayUiIntent
     data object DismissTask : DayUiIntent
     data object ToggleComplete : DayUiIntent
     data object EditTask : DayUiIntent
@@ -90,6 +100,12 @@ sealed interface DayUiIntent : UiIntent {
     data class ConfirmMove(val date: LocalDate) : DayUiIntent
     data object StartTimer : DayUiIntent
     data object PauseTimer : DayUiIntent
+    data object PreviousDay : DayUiIntent
+    data object NextDay : DayUiIntent
+    data object OpenDatePicker : DayUiIntent
+    data object DismissDatePicker : DayUiIntent
+    data class SelectDate(val date: LocalDate) : DayUiIntent
+    data class SetDialHalf(val half: DialHalf) : DayUiIntent
 }
 
 sealed interface DayUiEffect : UiEffect {

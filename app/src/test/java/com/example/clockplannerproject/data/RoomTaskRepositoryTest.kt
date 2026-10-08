@@ -77,7 +77,7 @@ class RoomTaskRepositoryTest {
         val moved = repository.observeTasks(dest).first().single()
         assertEquals(task.id, moved.id)
         assertEquals(task.blocks, moved.blocks)
-        assertEquals(task.tags, moved.tags)
+        assertEquals(task.project, moved.project)
     }
 
     @Test
@@ -108,11 +108,26 @@ class RoomTaskRepositoryTest {
             colorArgb = 0xFF80CBC4,
             date = date,
             importance = Importance.HIGH,
-            tags = listOf("admin", "mail"),
+            project = "admin",
         )
         repository.upsert(task)
         assertEquals(task, repository.observeTasks(date).first().single())
         assertTrue(repository.observeTasks(date).first().single().isUntimed)
+    }
+
+    @Test
+    fun backlog_moveToDay_changesBothObservations() = runTest {
+        val repository = RoomTaskRepository(InMemoryTaskDao(), Dispatchers.Unconfined)
+        val target = LocalDate(2026, 10, 6)
+        val backlog = sample(target).copy(date = null, blocks = emptyList(), project = "Work")
+        repository.upsert(backlog)
+        assertEquals(listOf(backlog), repository.observeUnscheduled().first())
+        assertTrue(repository.observeTasks(target).first().isEmpty())
+
+        repository.upsert(backlog.copy(date = target))
+
+        assertTrue(repository.observeUnscheduled().first().isEmpty())
+        assertEquals(backlog.id, repository.observeTasks(target).first().single().id)
     }
 
     private fun sample(date: LocalDate) = Task(
@@ -123,7 +138,7 @@ class RoomTaskRepositoryTest {
         blocks = listOf(TimeBlock(9 * 60, 12 * 60)),
         status = TaskStatus.TODO,
         date = date,
-        tags = listOf("work"),
+        project = "work",
     )
 }
 
@@ -138,6 +153,20 @@ private class InMemoryTaskDao : TaskDao {
                     task = entity,
                     blocks = blockRows.filter { it.taskId == entity.id },
                 )
+            }
+        }
+
+    override fun observeUnscheduled(): Flow<List<TaskWithBlocks>> =
+        combine(tasks, blocks) { taskRows, blockRows ->
+            taskRows.filter { it.dateIso == null }.map { entity ->
+                TaskWithBlocks(entity, blockRows.filter { it.taskId == entity.id })
+            }
+        }
+
+    override fun observeAll(): Flow<List<TaskWithBlocks>> =
+        combine(tasks, blocks) { taskRows, blockRows ->
+            taskRows.map { entity ->
+                TaskWithBlocks(entity, blockRows.filter { it.taskId == entity.id })
             }
         }
 

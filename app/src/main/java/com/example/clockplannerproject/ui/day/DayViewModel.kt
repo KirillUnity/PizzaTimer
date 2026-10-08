@@ -3,6 +3,7 @@ package com.example.clockplannerproject.ui.day
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.data.SampleDaySeeder
+import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
@@ -12,7 +13,9 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.time.TimeMath
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,7 +24,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -46,6 +51,8 @@ class DayViewModel(
     val effect = effects.receiveAsFlow()
 
     private val retryTick = MutableStateFlow(0)
+    private val selectedDate = MutableStateFlow(timeProvider.today())
+    private var halfSeeded = false
     private val materializer = RecurrenceMaterializer(taskRepository)
 
     init {
@@ -57,13 +64,22 @@ class DayViewModel(
             DayUiIntent.Retry -> retryTick.update { it + 1 }
             is DayUiIntent.SelectTask -> _state.update {
                 if (it.selectedTask?.id == intent.task.id) {
-                    it.copy(selectedTask = null)
+                    it.copy(selectedTask = null, detailsOpen = false)
                 } else {
-                    it.copy(selectedTask = intent.task)
+                    it.copy(selectedTask = intent.task, detailsOpen = false)
                 }
             }
+            is DayUiIntent.OpenTaskDetails -> _state.update {
+                val task = intent.task ?: it.selectedTask
+                if (task == null) {
+                    it
+                } else {
+                    it.copy(selectedTask = task, detailsOpen = true)
+                }
+            }
+            DayUiIntent.DismissDetails -> _state.update { it.copy(detailsOpen = false) }
             DayUiIntent.DismissTask -> _state.update {
-                it.copy(selectedTask = null, showMovePicker = false)
+                it.copy(selectedTask = null, detailsOpen = false, showMovePicker = false)
             }
             DayUiIntent.ToggleComplete -> toggleComplete()
             DayUiIntent.EditTask -> openEditor()
@@ -105,7 +121,20 @@ class DayViewModel(
             is DayUiIntent.ConfirmMove -> moveSelected(intent.date)
             DayUiIntent.StartTimer -> startTimer()
             DayUiIntent.PauseTimer -> pauseTimer()
+            DayUiIntent.PreviousDay -> shiftDate(-1)
+            DayUiIntent.NextDay -> shiftDate(1)
+            DayUiIntent.OpenDatePicker -> _state.update { it.copy(showDatePicker = true) }
+            DayUiIntent.DismissDatePicker -> _state.update { it.copy(showDatePicker = false) }
+            is DayUiIntent.SelectDate -> {
+                selectedDate.value = intent.date
+                _state.update { it.copy(showDatePicker = false) }
+            }
+            is DayUiIntent.SetDialHalf -> _state.update { it.copy(dialHalf = intent.half) }
         }
+    }
+
+    private fun shiftDate(days: Int) {
+        selectedDate.update { it.plus(days, DateTimeUnit.DAY) }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -124,8 +153,10 @@ class DayViewModel(
                         )
                     }
                     var lastMaterialized: LocalDate? = null
-                    timeProvider.observeTime()
-                        .map { time -> timeProvider.today() to time }
+                    combine(
+                        timeProvider.observeTime(),
+                        selectedDate.filterNotNull(),
+                    ) { time, date -> date to time }
                         .distinctUntilChanged()
                         .flatMapLatest { (date, time) ->
                             if (lastMaterialized != date) {
@@ -133,27 +164,41 @@ class DayViewModel(
                                 lastMaterialized = date
                             }
                             taskRepository.observeTasks(date).map { tasks ->
-                                val selected = _state.value.selectedTask?.id?.let { id ->
+                                val current = _state.value
+                                val selected = current.selectedTask?.id?.let { id ->
                                     tasks.find { it.id == id }
                                 }
-                                val pending = _state.value.pendingDelete?.id?.let { id ->
+                                val pending = current.pendingDelete?.id?.let { id ->
                                     tasks.find { it.id == id }
+                                }
+                                val half = if (!halfSeeded) {
+                                    halfSeeded = true
+                                    if (DialHalf.PM.contains(TimeMath.minuteOfDay(time))) {
+                                        DialHalf.PM
+                                    } else {
+                                        DialHalf.AM
+                                    }
+                                } else {
+                                    current.dialHalf
                                 }
                                 DayUiState(
                                     date = date,
                                     now = time,
                                     tasks = tasks,
                                     selectedTask = selected,
+                                    detailsOpen = current.detailsOpen && selected != null,
                                     pendingDelete = pending,
                                     isLoading = false,
                                     errorMessage = null,
-                                    userRotationOffsetDeg = _state.value.userRotationOffsetDeg,
-                                    resizingTaskId = _state.value.resizingTaskId,
-                                    resizePreviewEndMinute = _state.value.resizePreviewEndMinute,
-                                    resizeBlockStartMinute = _state.value.resizeBlockStartMinute,
-                                    hideCompleted = _state.value.hideCompleted,
-                                    viewMode = _state.value.viewMode,
-                                    showMovePicker = _state.value.showMovePicker,
+                                    userRotationOffsetDeg = current.userRotationOffsetDeg,
+                                    resizingTaskId = current.resizingTaskId,
+                                    resizePreviewEndMinute = current.resizePreviewEndMinute,
+                                    resizeBlockStartMinute = current.resizeBlockStartMinute,
+                                    hideCompleted = current.hideCompleted,
+                                    viewMode = current.viewMode,
+                                    showMovePicker = current.showMovePicker,
+                                    showDatePicker = current.showDatePicker,
+                                    dialHalf = half,
                                 )
                             }
                         }
@@ -247,7 +292,7 @@ class DayViewModel(
 
     private fun openEditor() {
         val task = _state.value.selectedTask ?: return
-        _state.update { it.copy(selectedTask = null) }
+        _state.update { it.copy(selectedTask = null, detailsOpen = false) }
         viewModelScope.launch {
             effects.send(DayUiEffect.OpenEditor(task))
         }
@@ -278,7 +323,9 @@ class DayViewModel(
         viewModelScope.launch {
             try {
                 taskRepository.upsert(TaskInstances.moved(task, date))
-                _state.update { it.copy(selectedTask = null, showMovePicker = false) }
+                _state.update {
+                    it.copy(selectedTask = null, detailsOpen = false, showMovePicker = false)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -327,6 +374,7 @@ class DayViewModel(
                         selectedTask = it.selectedTask?.takeUnless { selected ->
                             selected.id == task.id
                         },
+                        detailsOpen = it.detailsOpen && it.selectedTask?.id != task.id,
                     )
                 }
             } catch (cancelled: CancellationException) {

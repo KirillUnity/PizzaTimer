@@ -61,6 +61,7 @@ fun TimeDial(
     onStartTimer: () -> Unit = {},
     onPauseTimer: () -> Unit = {},
     onDismissSelection: () -> Unit = {},
+    onOpenDetails: () -> Unit = {},
 ) {
     val completed = remember(config.colors.completedArgb) {
         argbToColor(config.colors.completedArgb)
@@ -152,6 +153,12 @@ fun TimeDial(
             onResizeCancel = onResizeCancel,
             accessibilityTasks = accessibilityTasks,
         )
+        DialHoleContent(
+            now = currentTime,
+            selectedTask = selectedTask,
+            onStartTimer = onStartTimer,
+            onPauseTimer = onPauseTimer,
+        )
         selectedTask?.let { selected ->
             SelectedTaskOverlays(
                 task = selected,
@@ -163,6 +170,7 @@ fun TimeDial(
                 onDismiss = onDismissSelection,
                 onStartTimer = onStartTimer,
                 onPauseTimer = onPauseTimer,
+                onOpenDetails = onOpenDetails,
             )
         }
     }
@@ -297,6 +305,40 @@ private fun TimeDialPizzaPreview() {
     }
 }
 
+@Preview(showBackground = true, name = "Pizza two Sport sectors")
+@Composable
+private fun TimeDialPizzaTwoBlocksPreview() {
+    ClockPlannerProjectTheme {
+        TimeDial(
+            tasks = listOf(SampleTasks.sportTwoBlocks(LocalDate(2026, 10, 6))),
+            currentTime = LocalTime(13, 0, 0),
+            half = DialHalf.PM,
+            config = TimeDialConfig.Default.copy(viewMode = ViewMode.PIZZA),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Petals two Sport sectors")
+@Composable
+private fun TimeDialPetalsTwoBlocksPreview() {
+    ClockPlannerProjectTheme {
+        TimeDial(
+            tasks = listOf(SampleTasks.sportTwoBlocks(LocalDate(2026, 10, 6))),
+            currentTime = LocalTime(13, 0, 0),
+            half = DialHalf.PM,
+            config = TimeDialConfig.Default.copy(viewMode = ViewMode.PETALS),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(16.dp),
+        )
+    }
+}
+
 @Preview(showBackground = true, name = "Untimed 50/50 leftover AM")
 @Composable
 private fun TimeDialUntimedPreview() {
@@ -337,6 +379,40 @@ private fun TimeDialImportancePreview() {
             tasks = SampleTasks.threeImportances(LocalDate(2026, 10, 6)),
             currentTime = LocalTime(9, 30, 0),
             half = DialHalf.AM,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Idle LIVE CHRONO")
+@Composable
+private fun TimeDialIdlePreview() {
+    ClockPlannerProjectTheme {
+        TimeDial(
+            tasks = PreviewDialTasks,
+            currentTime = LocalTime(10, 42, 0),
+            half = DialHalf.AM,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Selected callout + Start")
+@Composable
+private fun TimeDialSelectedPreview() {
+    val tasks = PreviewDialTasks
+    ClockPlannerProjectTheme {
+        TimeDial(
+            tasks = tasks,
+            currentTime = LocalTime(10, 42, 0),
+            half = DialHalf.AM,
+            selectedTask = tasks.first { it.blocks.isNotEmpty() },
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)

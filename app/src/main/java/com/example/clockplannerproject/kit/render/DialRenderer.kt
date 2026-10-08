@@ -63,10 +63,13 @@ data class DialDrawState(
     val extras: List<Path>,
     val labelPaint: android.graphics.Paint,
     val stroke: Stroke,
+    val selectedStroke: Stroke,
+    val selectionOutline: Stroke,
     val chevron: Path,
     val showNowMarker: Boolean,
     val chevronColor: Color,
     val markerAlpha: Float,
     val handleDeg: Float?,
     val handleColor: Color,
+    val canvasColor: Color,
 )

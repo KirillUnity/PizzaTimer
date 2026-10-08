@@ -20,6 +20,7 @@ class RecurrenceMaterializer(
     suspend fun ensureVisibleDay(date: LocalDate) {
         val templates = repository.listRecurringTemplates()
         for (template in templates) {
+            if (template.date == null) continue
             if (!template.recurrence.occursOn(date)) continue
             val series = template.seriesId ?: template.id.value
             if (repository.hasSeriesOnDate(series, date)) continue

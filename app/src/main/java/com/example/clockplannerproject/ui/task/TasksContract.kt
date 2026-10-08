@@ -2,7 +2,9 @@ package com.example.clockplannerproject.ui.task
 
 import com.example.clockplannerproject.kit.core.Importance
 import com.example.clockplannerproject.kit.core.RecurrenceRule
+import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskReport
 import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskPalette
@@ -22,28 +24,30 @@ data class TaskEditorState(
     val blocks: List<TimeBlock> = emptyList(),
     val status: TaskStatus = TaskStatus.TODO,
     val importance: Importance = Importance.MEDIUM,
-    val tags: List<String> = emptyList(),
-    val tagDraft: String = "",
+    val project: String = "",
+    val scheduledDate: LocalDate? = null,
     val error: TaskDraftError? = null,
     val recurrence: RecurrenceRule = RecurrenceRule.None,
     val seriesId: String? = null,
 ) {
     val isNew: Boolean get() = id == null
 
-    fun toTask(date: LocalDate): Task {
+    fun toTask(): Task {
         val resolvedId = id ?: TaskId(UUID.randomUUID().toString())
+        val normalizedProject = project.trim().takeIf { it.isNotEmpty() }
+        val normalizedRecurrence = if (scheduledDate == null) RecurrenceRule.None else recurrence
         return Task(
             id = resolvedId,
             title = title.trim(),
             description = description.trim(),
             colorArgb = colorArgb,
-            blocks = blocks,
+            blocks = if (scheduledDate == null) emptyList() else blocks,
             status = status,
-            date = date,
+            date = scheduledDate,
             importance = importance,
-            tags = tags,
-            recurrence = recurrence,
-            seriesId = if (recurrence is RecurrenceRule.None) {
+            project = normalizedProject,
+            recurrence = normalizedRecurrence,
+            seriesId = if (normalizedRecurrence is RecurrenceRule.None) {
                 seriesId
             } else {
                 seriesId ?: resolvedId.value
@@ -60,7 +64,8 @@ data class TaskEditorState(
             blocks = task.blocks,
             status = task.status,
             importance = task.importance,
-            tags = task.tags,
+            project = task.normalizedProject.orEmpty(),
+            scheduledDate = task.date,
             recurrence = task.recurrence,
             seriesId = task.seriesId,
         )
@@ -81,23 +86,52 @@ data class TasksUiState(
     val pendingDelete: Task? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
-    val tagFilter: String? = null,
+    val selectedProject: String? = null,
+    val projectSearch: String = "",
     val nowMinute: Int = 0,
     val pendingMove: Task? = null,
+    val reports: List<TaskReport> = emptyList(),
+    val reportDraft: String = "",
+    val editingReportId: ReportId? = null,
 ) : UiState {
     val visibleTasks: List<Task>
         get() {
-            val filter = tagFilter
-            val list = if (filter.isNullOrBlank()) tasks else tasks.filter { filter in it.tags }
-            return list.sortedBy { it.sortMinute }
+            val selected = selectedProject
+            val query = projectSearch.trim()
+            return tasks.asSequence()
+                .filter { task ->
+                    selected == null || task.normalizedProject.equals(selected, ignoreCase = true)
+                }
+                .filter { task ->
+                    query.isEmpty() ||
+                        task.normalizedProject?.contains(query, ignoreCase = true) == true
+                }
+                .sortedWith(
+                    compareBy<Task>(
+                        { it.normalizedProject?.lowercase().orEmpty() },
+                        { it.date != null },
+                        { it.date },
+                        { it.sortMinute },
+                        { it.title.lowercase() },
+                        { it.id.value },
+                    ),
+                )
+                .toList()
         }
 
-    val availableTags: List<String>
-        get() = tasks.flatMap { it.tags }.distinct().sorted()
+    val availableProjects: List<String>
+        get() {
+            val query = projectSearch.trim()
+            return tasks.mapNotNull(Task::normalizedProject)
+                .distinctBy { it.lowercase() }
+                .filter { query.isEmpty() || it.contains(query, ignoreCase = true) }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        }
 }
 
 sealed interface TasksUiIntent : UiIntent {
     data object Create : TasksUiIntent
+    data object CreateForSelectedDay : TasksUiIntent
     data class Edit(val task: Task) : TasksUiIntent
     data object Update : TasksUiIntent
     data class Delete(val task: Task) : TasksUiIntent
@@ -119,10 +153,12 @@ sealed interface TasksUiIntent : UiIntent {
     data object ClearTime : TasksUiIntent
     data class ChangeStatus(val status: TaskStatus) : TasksUiIntent
     data class ChangeImportance(val importance: Importance) : TasksUiIntent
-    data class ChangeTagDraft(val value: String) : TasksUiIntent
-    data object AddTag : TasksUiIntent
-    data class RemoveTag(val tag: String) : TasksUiIntent
-    data class FilterByTag(val tag: String?) : TasksUiIntent
+    data class ChangeProject(val value: String) : TasksUiIntent
+    data class FilterByProject(val project: String?) : TasksUiIntent
+    data class ChangeProjectSearch(val query: String) : TasksUiIntent
+    data object ClearProjectSearch : TasksUiIntent
+    data class ChangeScheduled(val scheduled: Boolean) : TasksUiIntent
+    data class MoveToDiagram(val task: Task) : TasksUiIntent
     data class OpenStartPicker(val index: Int) : TasksUiIntent
     data class OpenEndPicker(val index: Int) : TasksUiIntent
     data object DismissTimePicker : TasksUiIntent
@@ -131,6 +167,10 @@ sealed interface TasksUiIntent : UiIntent {
     data object DismissMove : TasksUiIntent
     data class ConfirmMove(val date: LocalDate) : TasksUiIntent
     data class ChangeRecurrence(val rule: RecurrenceRule) : TasksUiIntent
+    data class ChangeReportDraft(val text: String) : TasksUiIntent
+    data class EditReport(val report: TaskReport) : TasksUiIntent
+    data object SaveReport : TasksUiIntent
+    data class DeleteReport(val id: ReportId) : TasksUiIntent
 }
 
 sealed interface TasksUiEffect : UiEffect {

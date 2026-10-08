@@ -67,4 +67,48 @@ class DialHalfTest {
         assertEquals(12 * 60, pm.startMinute)
         assertEquals(14 * 60, pm.endMinute)
     }
+
+    @Test
+    fun calloutSlice_prefersLaterBlockOnSameHalf() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(10 * 60, 11 * 60)),
+            date = date,
+        )
+        val slice = calloutSlice(sport, DialHalf.AM, nowMinute = 11 * 60 + 30)
+        assertEquals(10 * 60, slice?.startMinute)
+        assertEquals(11 * 60, slice?.endMinute)
+    }
+
+    @Test
+    fun calloutSlice_prefersOpenTimer() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, null)),
+            date = date,
+        )
+        val slice = calloutSlice(sport, DialHalf.PM, nowMinute = 12 * 60 + 30)
+        assertEquals(12 * 60, slice?.startMinute)
+        assertEquals(12 * 60 + 30, slice?.endMinute)
+    }
+
+    @Test
+    fun resizableSlices_closedFirstBlockDoesNotLockLater() {
+        val sport = Task(
+            id = TaskId("sport"),
+            title = "Sport",
+            colorArgb = 0xFFE8B4B8,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(10 * 60, 11 * 60)),
+            date = date,
+        )
+        val now = 9 * 60 + 30
+        val slices = resizableSlices(sport, DialHalf.AM, now)
+        assertEquals(1, slices.size)
+        assertEquals(10 * 60, slices.single().startMinute)
+        assertTrue(sport.blocks.first().isClosed(now))
+    }
 }
