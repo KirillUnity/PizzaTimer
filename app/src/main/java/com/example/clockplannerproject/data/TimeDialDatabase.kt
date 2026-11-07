@@ -8,8 +8,9 @@ import androidx.room.RoomDatabase
 /**
  * Local TimeDial database.
  *
- * Schema v5:
- * `tasks(...)`, `time_blocks(...)`, `task_reports(id, taskId, createdAtEpochMillis, text)`
+ * Schema v6:
+ * `tasks(...)`, `time_blocks(...)`,
+ * `task_reports(..., text, attachmentRelativePath, attachmentDisplayName, attachmentMimeType)`
  *
  * **No Room `Migration` class.** Version bumps use
  * [fallbackToDestructiveMigration] only. Installing an app update that
@@ -20,7 +21,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [TaskEntity::class, TimeBlockEntity::class, TaskReportEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class TimeDialDatabase : RoomDatabase() {

@@ -4,10 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -35,7 +37,9 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.ui.day.DayDestinationContent
 import com.example.clockplannerproject.ui.navigation.AppDestinations
-import com.example.clockplannerproject.ui.settings.SettingsScreen
+import com.example.clockplannerproject.ui.onboarding.OnboardingScreen
+import com.example.clockplannerproject.ui.settings.SettingsDestinationContent
+import com.example.clockplannerproject.ui.settings.SettingsViewModel
 import com.example.clockplannerproject.ui.stats.ReportsDestinationContent
 import com.example.clockplannerproject.ui.task.TaskEditorOverlays
 import com.example.clockplannerproject.ui.task.TasksDestinationContent
@@ -49,6 +53,7 @@ import org.koin.androidx.compose.koinViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -63,30 +68,47 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ClockPlannerProjectApp() {
     if (LocalInspectionMode.current) {
-        ClockPlannerProjectNav(onQuickCreate = {})
+        ClockPlannerProjectNav(onQuickCreate = {}, onShowOnboarding = {})
     } else {
         val tasksViewModel: TasksViewModel = koinViewModel()
-        ClockPlannerProjectNav(
-            onQuickCreate = { tasksViewModel.onIntent(TasksUiIntent.Create) },
-            tasksViewModel = tasksViewModel,
-        )
+        val settingsViewModel: SettingsViewModel = koinViewModel()
+        val seen by settingsViewModel.onboardingSeen.collectAsStateWithLifecycle()
+        var replay by rememberSaveable { mutableStateOf(false) }
+        when {
+            seen == null -> Box(Modifier.fillMaxSize())
+            replay || seen == false -> OnboardingScreen(
+                onFinished = {
+                    replay = false
+                    settingsViewModel.markOnboardingSeen()
+                },
+            )
+            else -> ClockPlannerProjectNav(
+                onQuickCreate = { tasksViewModel.onIntent(TasksUiIntent.Create) },
+                tasksViewModel = tasksViewModel,
+                onShowOnboarding = { replay = true },
+            )
+        }
     }
 }
 
 @Composable
 private fun ClockPlannerProjectNav(
     onQuickCreate: () -> Unit,
+    onShowOnboarding: () -> Unit,
     tasksViewModel: TasksViewModel? = null,
 ) {
     var currentDestination by rememberSaveable {
         mutableStateOf(AppDestinations.DAY)
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     if (tasksViewModel != null) {
         LaunchedEffect(tasksViewModel) {
             tasksViewModel.effect.collect { effect ->
                 when (effect) {
                     is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
+                    is TasksUiEffect.ShowMessageRes ->
+                        snackbarHostState.showSnackbar(context.getString(effect.resId))
                 }
             }
         }
@@ -157,7 +179,10 @@ private fun ClockPlannerProjectNav(
                         showEditorOverlays = false,
                     )
                     AppDestinations.REPORTS -> ReportsDestinationContent(modifier = contentModifier)
-                    AppDestinations.SETTINGS -> SettingsScreen(modifier = contentModifier)
+                    AppDestinations.SETTINGS -> SettingsDestinationContent(
+                        onShowOnboarding = onShowOnboarding,
+                        modifier = contentModifier,
+                    )
                 }
             }
             if (tasksViewModel != null) {

@@ -1,5 +1,6 @@
 package com.example.clockplannerproject.data
 
+import com.example.clockplannerproject.kit.core.ReportFileStore
 import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.TaskId
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 class RoomReportRepository(
     private val reportDao: ReportDao,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val fileStore: ReportFileStore = ReportFileStore.NoOp,
 ) : ReportRepository {
     override fun observeReports(taskId: TaskId): Flow<List<TaskReport>> =
         reportDao.observeByTask(taskId.value)
@@ -32,13 +34,22 @@ class RoomReportRepository(
 
     override suspend fun upsert(report: TaskReport) {
         withContext(ioDispatcher) {
+            val previous = reportDao.findById(report.id.value)?.attachmentRelativePath
             reportDao.upsert(report.toEntity())
+            val next = report.attachment?.relativePath
+            if (previous != null && previous != next) {
+                fileStore.delete(previous)
+            }
         }
     }
 
     override suspend fun delete(id: ReportId) {
         withContext(ioDispatcher) {
+            val previous = reportDao.findById(id.value)?.attachmentRelativePath
             reportDao.deleteById(id.value)
+            if (previous != null) {
+                fileStore.delete(previous)
+            }
         }
     }
 }

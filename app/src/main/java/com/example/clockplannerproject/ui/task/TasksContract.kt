@@ -13,6 +13,9 @@ import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.mvi.UiEffect
 import com.example.clockplannerproject.kit.core.mvi.UiIntent
 import com.example.clockplannerproject.kit.core.mvi.UiState
+import com.example.clockplannerproject.kit.core.planner.DEFAULT_WORK_END_MINUTE
+import com.example.clockplannerproject.kit.core.planner.DEFAULT_WORK_START_MINUTE
+import com.example.clockplannerproject.kit.core.planner.PlanDraft
 import kotlinx.datetime.LocalDate
 import java.util.UUID
 
@@ -93,6 +96,10 @@ data class TasksUiState(
     val reports: List<TaskReport> = emptyList(),
     val reportDraft: String = "",
     val editingReportId: ReportId? = null,
+    val planSheet: PlanSheetUi? = null,
+    val planDeadlinePicker: Boolean = false,
+    val planStepDateIndex: Int? = null,
+    val planWindowEdge: PlanWindowEdge? = null,
 ) : UiState {
     val visibleTasks: List<Task>
         get() {
@@ -171,8 +178,103 @@ sealed interface TasksUiIntent : UiIntent {
     data class EditReport(val report: TaskReport) : TasksUiIntent
     data object SaveReport : TasksUiIntent
     data class DeleteReport(val id: ReportId) : TasksUiIntent
+    data class ImportReportAttachment(val id: ReportId, val sourceUri: String) : TasksUiIntent
+    data class RemoveReportAttachment(val id: ReportId) : TasksUiIntent
+    data object OpenPlan : TasksUiIntent
+    data object DismissPlan : TasksUiIntent
+    data class ChangePlanGoal(val goal: String) : TasksUiIntent
+    data object OpenPlanDeadlinePicker : TasksUiIntent
+    data object DismissPlanDeadlinePicker : TasksUiIntent
+    data class SelectPlanDeadline(val date: LocalDate) : TasksUiIntent
+    data class ShiftPlanWindow(val deltaMinutes: Int) : TasksUiIntent
+    data class NudgePlanWindowEdge(val edge: PlanWindowEdge, val deltaMinutes: Int) : TasksUiIntent
+    data class SetPlanWindow(val startMinute: Int, val endMinute: Int) : TasksUiIntent
+    data object OpenPlanWindowStart : TasksUiIntent
+    data object OpenPlanWindowEnd : TasksUiIntent
+    data object DismissPlanWindowTime : TasksUiIntent
+    data object SubmitPlan : TasksUiIntent
+    data class RemovePlanStep(val index: Int) : TasksUiIntent
+    data class OpenPlanStepDate(val index: Int) : TasksUiIntent
+    data object DismissPlanStepDate : TasksUiIntent
+    data class MovePlanStep(val index: Int, val date: LocalDate) : TasksUiIntent
+    data object AcceptPlan : TasksUiIntent
+}
+
+/**
+ * Which edge of the work window a time picker is editing.
+ *
+ * @since 1.1.0
+ */
+enum class PlanWindowEdge {
+    START,
+    END,
+}
+
+/**
+ * Goal form before a draft exists.
+ *
+ * @param goal text the user typed; blank is rejected on submit
+ * @param deadline local day, edited on the sheet
+ * @param workStartMinute inclusive minute of the work window
+ * @param workEndMinute exclusive minute of the work window
+ * @param message validation or service text; null when the form is clean
+ * @param submitting true while [com.example.clockplannerproject.kit.core.planner.PlannerSource.plan] is running
+ * @since 1.1.0
+ */
+data class PlanFormState(
+    val goal: String = "",
+    val deadline: LocalDate,
+    val workStartMinute: Int = DEFAULT_WORK_START_MINUTE,
+    val workEndMinute: Int = DEFAULT_WORK_END_MINUTE,
+    val message: String? = null,
+    val submitting: Boolean = false,
+)
+
+/**
+ * Draft shown after a successful plan response.
+ *
+ * @param goal goal that produced [draft]
+ * @param deadline deadline that produced [draft]
+ * @param workStartMinute window start used for [draft]
+ * @param workEndMinute window end used for [draft]
+ * @param draft verdict, minutes, steps, and narrative
+ * @param submitting true while a new deadline or window is being planned
+ * @param accepting true while placed steps are being written
+ * @param message explanation for a rejected step move; null otherwise
+ * @since 1.1.0
+ */
+data class PlanDraftUi(
+    val goal: String,
+    val deadline: LocalDate,
+    val workStartMinute: Int,
+    val workEndMinute: Int,
+    val draft: PlanDraft,
+    val submitting: Boolean = false,
+    val accepting: Boolean = false,
+    val message: String? = null,
+) {
+    /** True when «Place on the dial» may write placed steps. */
+    val canPlace: Boolean get() = !submitting && !accepting
+}
+
+/**
+ * Planner sheet. Absent from [TasksUiState.planSheet] when the sheet is closed.
+ *
+ * @since 1.1.0
+ */
+sealed interface PlanSheetUi {
+    /**
+     * @param form goal, deadline, and window
+     */
+    data class Form(val form: PlanFormState) : PlanSheetUi
+
+    /**
+     * @param draft verdict and steps
+     */
+    data class Draft(val draft: PlanDraftUi) : PlanSheetUi
 }
 
 sealed interface TasksUiEffect : UiEffect {
     data class ShowMessage(val message: String) : TasksUiEffect
+    data class ShowMessageRes(val resId: Int) : TasksUiEffect
 }

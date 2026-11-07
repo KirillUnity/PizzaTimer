@@ -14,13 +14,20 @@ val PaperOutline = Color(0xFFE5E0D6)
 val PaperInk = Color(0xFF1C1B18)
 val PaperInkMuted = Color(0xFF59413D)
 
-/** Now marker, FAB, primary actions. */
+/** Now marker, FAB, primary actions. Pressed state is the warm darken. */
 val TerracottaNow = Color(0xFFE0533C)
 val TerracottaPressed = Color(0xFFC8442F)
 val OnTerracotta = Color(0xFFFFFFFF)
 
-/** Unallocated / Rest. */
+/**
+ * Metadata ink. Sand is a fill, so text that used to read `secondary` stays readable.
+ * Stitch role `secondary`.
+ */
+val PaperSecondary = Color(0xFF675D52)
+
+/** Unallocated intervals and quiet secondary fills. */
 val SandRest = Color(0xFFEADBCE)
+val SandInk = Color(0xFF6B6156)
 val SandBorder = Color(0xFFD7C7B7)
 
 /** DONE sectors. */

@@ -3,18 +3,21 @@ package com.example.clockplannerproject.kit.core.config
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
 import com.example.clockplannerproject.kit.core.time.TaskResize
+import androidx.compose.runtime.Immutable
 
 /**
  * Visual configuration for the ring dial. Mutate with [copy].
  *
  * @since 0.1.0
  */
+@Immutable
 data class TimeDialConfig(
     val colors: ColorConfig = ColorConfig.Default,
     val geometry: GeometryConfig = GeometryConfig.Default,
     val clock: ClockConfig = ClockConfig.Default,
     val interaction: InteractionConfig = InteractionConfig.Default,
     val viewMode: ViewMode = ViewMode.DIAL,
+    val background: BackgroundConfig = BackgroundConfig.None,
 ) {
     companion object {
         val Default: TimeDialConfig = TimeDialConfig()

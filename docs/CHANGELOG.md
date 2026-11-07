@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0 — v1.0-android — 2026-11-06
+
+Week 6 shell. No git tag unless asked. No KMP.
+
+### Added
+- Report photo/file copied into app `filesDir` (`report-media/`); path stored on the Room report row. Preview, open, delete. No storage permission (system pickers). No cloud
+- `BackgroundConfig`: None, Color, three presets (parchment, night ink, terracotta wash) under DIAL and PIZZA, with a paper scrim. `UserImage` is an API plus a “coming” stub
+- DataStore `AppearanceRepository`: default view mode, accent, completed color, background. Unknown preference values fall back; this is not a Room migration
+- Onboarding (dial, leftover 5:3:2, center Start, empty day). Skip persists `onboarding_seen`. Settings can open it again
+- User-facing strings in `values` and `values-ru` (system locale)
+- TalkBack names on Start/Pause, callout, view mode, reports, and attachment actions. Dial custom actions stay
+- Paper-craft launcher icon and splash
+- Play checklist: [PLAY_CHECKLIST.md](PLAY_CHECKLIST.md)
+
+### Storage
+- Room schema **v6** with `fallbackToDestructiveMigration()` — **no `Migration` class**. A schema bump **wipes the local database**
+
+### Not in 1.0.0
+- Play upload, git tag
+- KMP / iOS, Google/Apple Calendar, cloud, widgets
+- Photo-picker backgrounds, video editor, day PNG export
+
 ## 0.5.0 — 2026-10-08
 
 Week 5: Horological Paper Craft + thin text reports.

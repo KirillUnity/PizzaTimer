@@ -1,38 +1,35 @@
-# PizzaTimer (TimeDial)
+# TimeDial Planner
 
-Android day planner drawn as a **clock face**, not a list. One day is two 12-hour faces (AM / PM). Tasks are colored sectors; tap a sector for the full card.
+Android day planner drawn as a **clock face**, not a list. One day is two 12-hour faces (AM / PM). Tasks are colored sectors; tap a sector for the description.
 
-GitHub: [KirillUnity/PizzaTimer](https://github.com/KirillUnity/PizzaTimer)
-
-Current version: **v0.3.0**
+Current version: **1.0.0** (`v1.0-android`). Product spec: [docs/TZ.md](docs/TZ.md).
 
 ---
 
-## Description
+## What v1.0-android can do
 
-PizzaTimer (internal name **TimeDial**) lets you plan a day on a dial:
+- **DIAL**, **PIZZA**, **PETALS**, and **LIST** for the same day
+- Untimed tasks fill leftover minutes (importance **5 : 3 : 2**)
+- Projects, importance, move/duplicate, and daily or weekday recurrence
+- **Start / Pause** in the center of the dial (new interval only; closed blocks stay)
+- Text reports with a **local photo or file** copied into the app files directory
+- Dial underlays (none, solid color, three presets). A user photo is a stub
+- Settings stored in **DataStore**: default view, accent, completed color, background
+- Short onboarding, **English and Russian** from the system locale, TalkBack labels
 
-- **DIAL** — ring of sectors  
-- **PIZZA** — pie slices from the center  
-- **PETALS** — petal layout  
-- **LIST** — Compose list (not Canvas)
+## Not in v1.0-android (v2)
 
-A task can have **no clock time**, **one interval**, or **several `TimeBlock`s** (same task, several sectors). Untimed work fills leftover minutes on each 12-hour face by importance weights **HIGH : MEDIUM : LOW = 5 : 3 : 2**. Completed tasks use a gray color. Hide-completed **reflows** remaining work on the dial (list mode only filters).
-
-Local storage is Room + DataStore. Schema bumps use `fallbackToDestructiveMigration()` only — **updating a debug build wipes local tasks** until a production migration policy exists.
-
-Not in v0.3: center Start/Pause timer, recurrence, reports, calendar sync, iOS.
+- Kotlin Multiplatform, iOS, Compose Multiplatform
+- Google Calendar / Apple Calendar
+- Cloud sync, widgets, publishing the kit
 
 ---
 
-## Stack
+## Local database
 
-- Kotlin, Jetpack Compose, Material 3  
-- minSdk 29, namespace `com.example.clockplannerproject`  
-- MVI (`UiState` / `UiIntent` / `UiEffect`), **Koin**  
-- Room, DataStore, Coroutines / Flow, kotlinx-datetime  
+Room schema changes use `version++` and `fallbackToDestructiveMigration()` only. **There is no `Migration` class.** Installing a build whose schema version changed **wipes the local database** (tasks, blocks, reports). Uninstall or clear app storage. Attachment files under the app files directory are not a Room migration; clearing storage removes those too.
 
-Docs: [docs/TZ.md](docs/TZ.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [AGENTS.md](AGENTS.md)
+Preferences (view mode, colors, background, onboarding) live in DataStore and are not wiped by a Room schema bump.
 
 ---
 
@@ -41,19 +38,13 @@ Docs: [docs/TZ.md](docs/TZ.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/CH
 Needs **JDK 17+** and an **Android SDK**.
 
 ```bat
-git clone https://github.com/KirillUnity/PizzaTimer.git
-cd PizzaTimer
 gradlew.bat :app:assembleDebug
 gradlew.bat :app:testDebugUnitTest
 ```
 
-Or:
+Debug APK: `app\build\outputs\apk\debug\app-debug.apk` (or `dist\TimeDial-debug.apk` via `build-apk.bat` when that script is present). minSdk 29. First launch can seed a sample day.
 
-```bat
-build-apk.bat
-```
-
-APK: `dist\TimeDial-debug.apk`. Install on an emulator or device (API 29+). First debug launch seeds sample tasks for today.
+Docs: [docs/TZ.md](docs/TZ.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [docs/PLAY_CHECKLIST.md](docs/PLAY_CHECKLIST.md) · [AGENTS.md](AGENTS.md)
 
 ---
 

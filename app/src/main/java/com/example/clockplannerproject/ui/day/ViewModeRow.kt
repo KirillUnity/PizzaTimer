@@ -13,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.kit.core.ViewMode
@@ -39,13 +41,17 @@ fun ViewModeRow(
             .padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         modes.forEachIndexed { index, mode ->
+            val label = stringResource(viewModeLabel(mode))
+            val description = stringResource(R.string.cd_view_mode, label)
             SegmentedButton(
                 selected = selected == mode,
                 onClick = { onSelect(mode) },
                 shape = SegmentedButtonDefaults.itemShape(index, modes.size),
-                modifier = Modifier.widthIn(min = 76.dp),
+                modifier = Modifier
+                    .widthIn(min = 76.dp)
+                    .semantics { contentDescription = description },
             ) {
-                Text(stringResource(viewModeLabel(mode)))
+                Text(label)
             }
         }
     }

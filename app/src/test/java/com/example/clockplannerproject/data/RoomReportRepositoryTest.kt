@@ -1,5 +1,7 @@
 package com.example.clockplannerproject.data
 
+import com.example.clockplannerproject.kit.core.ReportAttachment
+import com.example.clockplannerproject.kit.core.ReportFileStore
 import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskReport
@@ -64,6 +66,30 @@ class RoomReportRepositoryTest {
         assertEquals("Final", listed.single().text)
         assertTrue(listed.single().createdAtEpochMillis == 1_000L)
     }
+
+    @Test
+    fun replaceAttachment_deletesPreviousFile() = runTest {
+        val store = RecordingFileStore()
+        val repository = RoomReportRepository(InMemoryReportDao(), Dispatchers.Unconfined, store)
+        val withFile = TaskReport(
+            id = ReportId("r1"),
+            taskId = TaskId("sport"),
+            createdAtEpochMillis = 1_000L,
+            text = "Note",
+            attachment = ReportAttachment("report-media/r1-a.jpg", "a.jpg", "image/jpeg"),
+        )
+        repository.upsert(withFile)
+        repository.upsert(withFile.copy(attachment = null))
+        assertEquals(listOf("report-media/r1-a.jpg"), store.deleted)
+        assertEquals(null, repository.observeReports(TaskId("sport")).first().single().attachment)
+    }
+}
+
+private class RecordingFileStore : ReportFileStore {
+    val deleted = mutableListOf<String>()
+    override fun delete(relativePath: String) {
+        deleted += relativePath
+    }
 }
 
 private class InMemoryReportDao : ReportDao {
@@ -76,6 +102,9 @@ private class InMemoryReportDao : ReportDao {
 
     override fun observeAll(): Flow<List<TaskReportEntity>> =
         rows.map { list -> list.sortedByDescending { it.createdAtEpochMillis } }
+
+    override suspend fun findById(id: String): TaskReportEntity? =
+        rows.value.find { it.id == id }
 
     override suspend fun upsert(entity: TaskReportEntity) {
         rows.update { current -> current.filterNot { it.id == entity.id } + entity }

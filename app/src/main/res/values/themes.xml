@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.ClockPlannerProject" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.ClockPlannerProject.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/paper_canvas</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.ClockPlannerProject</item>
+    </style>
 </resources>

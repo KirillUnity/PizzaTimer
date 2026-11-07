@@ -14,6 +14,8 @@ data class ReportsUiState(
     val draft: String = "",
     val editingId: ReportId? = null,
     val editingTaskId: TaskId? = null,
+    /** True while a manual collect is waiting on [com.example.clockplannerproject.kit.core.planner.PlannerSource.report]. */
+    val isCollecting: Boolean = false,
 ) : UiState
 
 sealed interface ReportsUiIntent : UiIntent {
@@ -21,8 +23,17 @@ sealed interface ReportsUiIntent : UiIntent {
     data class Edit(val report: TaskReport) : ReportsUiIntent
     data object Save : ReportsUiIntent
     data class Delete(val id: ReportId) : ReportsUiIntent
+    data class ImportAttachment(val id: ReportId, val sourceUri: String) : ReportsUiIntent
+    data class RemoveAttachment(val id: ReportId) : ReportsUiIntent
+
+    /** Collect closed work for the local today. Does not run on a schedule. */
+    data object CollectToday : ReportsUiIntent
+
+    /** Collect the seven local days ending today, including today. */
+    data object CollectWeek : ReportsUiIntent
 }
 
 sealed interface ReportsUiEffect : UiEffect {
     data class ShowMessage(val message: String) : ReportsUiEffect
+    data class ShowMessageRes(val resId: Int) : ReportsUiEffect
 }

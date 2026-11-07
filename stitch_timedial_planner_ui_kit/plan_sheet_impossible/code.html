@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Черновик — не помещается</title>
+<link href="https://fonts.googleapis.com/css2?family=Domine:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet"/>
+<link href="../_planner/chrome.css" rel="stylesheet"/>
+</head>
+<body>
+<header class="topbar"><div><h1 class="serif">Задачи</h1><span class="eyebrow">Новых секторов нет</span></div></header>
+<main>
+  <article class="card" style="--accent:#2563EB"><h3>Встреча с командой</h3><p class="when">Сегодня 10:00 – 12:00 · на месте</p></article>
+</main>
+<div class="scrim"></div>
+<section class="sheet" aria-label="Вердикт не помещается">
+  <div class="handle"></div>
+  <div class="verdict impossible">
+    <span class="material-symbols-outlined">error</span>
+    <div>
+      <strong>Не помещается</strong>
+      <p>Не хватает 720 минут до завтра. Минуты есть, но нет цельного окна под длинный шаг. Можно укоротить цель, сдвинуть день или снять с циферблата что-то необязательное.</p>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>480</b><span>свободно</span></div>
+    <div class="stat"><b>384</b><span>с запасом</span></div>
+    <div class="stat"><b>1 200</b><span>нужно</span></div>
+  </div>
+  <article class="step">
+    <h3>Набросать структуру</h3>
+    <p>Завтра 09:00–12:00 · окно нашлось, на часы попадёт</p>
+  </article>
+  <article class="step unplaced">
+    <h3>Свести таблицы</h3>
+    <p>Неразмещён · нет цельного окна. На циферблат не попадёт.</p>
+  </article>
+  <p class="actions-note">«Поставить на циферблат» запишет только шаги с цельным окном. Остальные останутся в этом списке. Без нажатия сектора не появляются.</p>
+  <button class="primary" type="button">Поставить на циферблат</button>
+  <button class="secondary-btn" type="button">Сдвинуть срок</button>
+  <button class="ghost" type="button">Закрыть без записи</button>
+</section>
+<nav class="nav">
+  <a href="#"><span class="material-symbols-outlined">schedule</span>День</a>
+  <a class="active" href="#"><span class="material-symbols-outlined">checklist</span>Задачи</a>
+  <a href="#"><span class="material-symbols-outlined">analytics</span>Отчёты</a>
+  <a href="#"><span class="material-symbols-outlined">settings</span>Настройки</a>
+</nav>
+</body>
+</html>

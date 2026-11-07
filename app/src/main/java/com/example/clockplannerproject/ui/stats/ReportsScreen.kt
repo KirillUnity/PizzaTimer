@@ -1,12 +1,17 @@
 package com.example.clockplannerproject.ui.stats
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,10 +22,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,16 +52,35 @@ fun ReportsDestinationContent(modifier: Modifier = Modifier) {
     } else {
         val viewModel: ReportsViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
-        ReportsScreen(
-            state = state,
-            onIntent = viewModel::onIntent,
-            modifier = modifier,
-        )
+        val snackbarHostState = remember { SnackbarHostState() }
+        val context = LocalContext.current
+        val launchers = rememberReportImportLaunchers { id, uri ->
+            viewModel.onIntent(ReportsUiIntent.ImportAttachment(id, uri))
+        }
+        LaunchedEffect(viewModel) {
+            viewModel.effect.collect { effect ->
+                val text = when (effect) {
+                    is ReportsUiEffect.ShowMessage -> effect.message
+                    is ReportsUiEffect.ShowMessageRes -> context.getString(effect.resId)
+                }
+                snackbarHostState.showSnackbar(text)
+            }
+        }
+        androidx.compose.foundation.layout.Box(modifier) {
+            ReportsScreen(
+                state = state,
+                onIntent = viewModel::onIntent,
+                onPickImage = launchers.pickImage,
+                onPickFile = launchers.pickFile,
+                modifier = Modifier.fillMaxSize(),
+            )
+            SnackbarHost(hostState = snackbarHostState)
+        }
     }
 }
 
 /**
- * Paper-chrome list of text reports. No media in v0.5.
+ * Paper-chrome list of notes. Each saved note can attach a local photo or file.
  *
  * @since 0.5.0
  */
@@ -59,6 +88,8 @@ fun ReportsDestinationContent(modifier: Modifier = Modifier) {
 fun ReportsScreen(
     state: ReportsUiState,
     onIntent: (ReportsUiIntent) -> Unit = {},
+    onPickImage: (ReportId) -> Unit = {},
+    onPickFile: (ReportId) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -74,9 +105,14 @@ fun ReportsScreen(
             text = stringResource(R.string.reports_cta),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
-        if (state.editingId != null) {
+        ReportCollectActions(
+            enabled = !state.isCollecting,
+            onIntent = onIntent,
+        )
+        val editingId = state.editingId
+        if (editingId != null) {
             OutlinedTextField(
                 value = state.draft,
                 onValueChange = { onIntent(ReportsUiIntent.ChangeDraft(it)) },
@@ -84,8 +120,13 @@ fun ReportsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
             )
-            TextButton(onClick = { onIntent(ReportsUiIntent.Save) }) {
-                Text(stringResource(R.string.report_save))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onIntent(ReportsUiIntent.Save) }) {
+                    Text(stringResource(R.string.report_save))
+                }
+                TextButton(onClick = { onIntent(ReportsUiIntent.Delete(editingId)) }) {
+                    Text(stringResource(R.string.report_delete_note))
+                }
             }
         }
         if (!state.isLoading && state.reports.isEmpty()) {
@@ -96,6 +137,7 @@ fun ReportsScreen(
             )
         } else {
             LazyColumn(
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
@@ -103,9 +145,42 @@ fun ReportsScreen(
                     ReportCard(
                         report = report,
                         onClick = { onIntent(ReportsUiIntent.Edit(report)) },
+                        onPickImage = { onPickImage(report.id) },
+                        onPickFile = { onPickFile(report.id) },
+                        onRemoveAttachment = {
+                            onIntent(ReportsUiIntent.RemoveAttachment(report.id))
+                        },
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReportCollectActions(
+    enabled: Boolean,
+    onIntent: (ReportsUiIntent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TextButton(
+            onClick = { onIntent(ReportsUiIntent.CollectToday) },
+            enabled = enabled,
+        ) {
+            Text(stringResource(R.string.reports_collect_today))
+        }
+        TextButton(
+            onClick = { onIntent(ReportsUiIntent.CollectWeek) },
+            enabled = enabled,
+        ) {
+            Text(stringResource(R.string.reports_collect_week))
         }
     }
 }
@@ -115,13 +190,19 @@ internal fun ReportCard(
     report: TaskReport,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onPickImage: (() -> Unit)? = null,
+    onPickFile: (() -> Unit)? = null,
+    onRemoveAttachment: (() -> Unit)? = null,
 ) {
     val whenLabel = formatReportTime(report.createdAtEpochMillis)
-    val preview = report.text.lineSequence().firstOrNull().orEmpty().ifBlank { "…" }
+    val preview = report.text.lineSequence().firstOrNull().orEmpty()
+        .ifBlank { stringResource(R.string.report_preview_empty) }
+    val cardCd = stringResource(R.string.cd_report_card, preview)
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = cardCd },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -135,6 +216,15 @@ internal fun ReportCard(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            if (onPickImage != null && onPickFile != null && onRemoveAttachment != null) {
+                ReportAttachmentRow(
+                    reportId = report.id,
+                    attachment = report.attachment,
+                    onPickImage = { onPickImage() },
+                    onPickFile = { onPickFile() },
+                    onRemove = { onRemoveAttachment() },
+                )
+            }
         }
     }
 }

@@ -2,7 +2,10 @@ package com.example.clockplannerproject.ui.day
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.clockplannerproject.data.InMemoryAppearanceRepository
 import com.example.clockplannerproject.data.SampleDaySeeder
+import com.example.clockplannerproject.kit.core.Appearance
+import com.example.clockplannerproject.kit.core.AppearanceRepository
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
 import com.example.clockplannerproject.kit.core.Task
@@ -42,6 +45,7 @@ class DayViewModel(
     private val taskRepository: TaskRepository,
     private val timeProvider: TimeProvider,
     private val sampleDaySeeder: SampleDaySeeder,
+    private val appearanceRepository: AppearanceRepository = InMemoryAppearanceRepository(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DayUiState())
@@ -54,8 +58,24 @@ class DayViewModel(
     private val selectedDate = MutableStateFlow(timeProvider.today())
     private var halfSeeded = false
     private val materializer = RecurrenceMaterializer(taskRepository)
+    private var latestAppearance = Appearance.Default
+    private var appearanceReady = false
 
     init {
+        viewModelScope.launch {
+            appearanceRepository.observeAppearance().collect { look ->
+                latestAppearance = look
+                appearanceReady = true
+                _state.update {
+                    it.copy(
+                        viewMode = look.viewMode,
+                        accentArgb = look.accentArgb,
+                        completedArgb = look.completedArgb,
+                        background = look.background,
+                    )
+                }
+            }
+        }
         observeDay()
     }
 
@@ -114,7 +134,12 @@ class DayViewModel(
             DayUiIntent.ToggleHideCompleted -> _state.update {
                 it.copy(hideCompleted = !it.hideCompleted)
             }
-            is DayUiIntent.SetViewMode -> _state.update { it.copy(viewMode = intent.mode) }
+            is DayUiIntent.SetViewMode -> {
+                _state.update { it.copy(viewMode = intent.mode) }
+                if (appearanceReady) {
+                    persistAppearance(latestAppearance.copy(viewMode = intent.mode))
+                }
+            }
             DayUiIntent.DuplicateTask -> duplicateSelected()
             DayUiIntent.RequestMove -> _state.update { it.copy(showMovePicker = it.selectedTask != null) }
             DayUiIntent.DismissMove -> _state.update { it.copy(showMovePicker = false) }
@@ -135,6 +160,13 @@ class DayViewModel(
 
     private fun shiftDate(days: Int) {
         selectedDate.update { it.plus(days, DateTimeUnit.DAY) }
+    }
+
+    private fun persistAppearance(next: Appearance) {
+        latestAppearance = next
+        viewModelScope.launch {
+            appearanceRepository.save(next)
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -195,7 +227,10 @@ class DayViewModel(
                                     resizePreviewEndMinute = current.resizePreviewEndMinute,
                                     resizeBlockStartMinute = current.resizeBlockStartMinute,
                                     hideCompleted = current.hideCompleted,
-                                    viewMode = current.viewMode,
+                                    viewMode = latestAppearance.viewMode,
+                                    accentArgb = latestAppearance.accentArgb,
+                                    completedArgb = latestAppearance.completedArgb,
+                                    background = latestAppearance.background,
                                     showMovePicker = current.showMovePicker,
                                     showDatePicker = current.showDatePicker,
                                     dialHalf = half,

@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.halfAnchorMinute
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
@@ -198,6 +201,13 @@ fun DialView(
                 customActions = talkBackActions
             },
     ) {
+        val showUnderlay = config.viewMode == ViewMode.DIAL || config.viewMode == ViewMode.PIZZA
+        if (showUnderlay) {
+            DialUnderlay(
+                background = config.background,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -268,6 +278,7 @@ fun DialView(
                 },
         )
         DialNumerals(
+            shadowColor = canvasColor,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(2.dp),
@@ -276,9 +287,14 @@ fun DialView(
 }
 
 @Composable
-private fun DialNumerals(modifier: Modifier = Modifier) {
+private fun DialNumerals(
+    shadowColor: Color,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier = modifier) {
-        val style = MaterialTheme.typography.labelMedium
+        val style = MaterialTheme.typography.labelMedium.copy(
+            shadow = Shadow(color = shadowColor, offset = Offset.Zero, blurRadius = 8f),
+        )
         val color = MaterialTheme.colorScheme.onSurfaceVariant
         Text("12", style = style, color = color, modifier = Modifier.align(Alignment.TopCenter))
         Text("3", style = style, color = color, modifier = Modifier.align(Alignment.CenterEnd))

@@ -104,7 +104,8 @@ fun LiveChronoHole(
     now: LocalTime?,
     modifier: Modifier = Modifier,
 ) {
-    val clockText = now?.let { TimeMath.formatHm(it) } ?: "—"
+    val clockText = now?.let { TimeMath.formatHm(it) }
+        ?: stringResource(R.string.time_placeholder)
     val description = stringResource(R.string.cd_current_time, clockText)
     Column(
         modifier = modifier.semantics { contentDescription = description },

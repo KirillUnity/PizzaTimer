@@ -19,6 +19,9 @@ interface ReportDao {
     @Query("SELECT * FROM task_reports ORDER BY createdAtEpochMillis DESC")
     fun observeAll(): Flow<List<TaskReportEntity>>
 
+    @Query("SELECT * FROM task_reports WHERE id = :id LIMIT 1")
+    suspend fun findById(id: String): TaskReportEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: TaskReportEntity)
 

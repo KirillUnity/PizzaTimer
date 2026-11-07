@@ -164,9 +164,23 @@ fun DayScreen(
     val showEmpty = !state.isLoading && state.tasks.isEmpty() && state.errorMessage == null
     val canvasMode = state.viewMode != ViewMode.LIST
     val compact = state.hideCompleted && canvasMode
-    val dialConfig = remember(state.userRotationOffsetDeg, compact, state.viewMode) {
+    val dialConfig = remember(
+        state.userRotationOffsetDeg,
+        compact,
+        state.viewMode,
+        state.accentArgb,
+        state.completedArgb,
+        state.background,
+    ) {
         TimeDialConfig.Default.copy(
             viewMode = state.viewMode,
+            colors = TimeDialConfig.Default.colors.copy(
+                nowMarkerArgb = state.accentArgb,
+                focusArgb = state.accentArgb,
+                handleArgb = state.accentArgb,
+                completedArgb = state.completedArgb,
+            ),
+            background = state.background,
             clock = TimeDialConfig.Default.clock.copy(
                 reflowMode = if (compact) {
                     ReflowMode.CompactRemaining
@@ -198,7 +212,8 @@ fun DayScreen(
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val clockText = state.now?.let { TimeMath.formatHm(it) } ?: "—"
+                val clockText = state.now?.let { TimeMath.formatHm(it) }
+                    ?: stringResource(R.string.time_placeholder)
                 val description = stringResource(R.string.cd_current_time, clockText)
                 Text(
                     text = clockText,

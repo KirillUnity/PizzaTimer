@@ -1,9 +1,11 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.kit.core.Appearance
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.ViewMode
+import com.example.clockplannerproject.kit.core.config.BackgroundConfig
 import com.example.clockplannerproject.kit.core.mvi.UiEffect
 import com.example.clockplannerproject.kit.core.mvi.UiIntent
 import com.example.clockplannerproject.kit.core.mvi.UiState
@@ -33,6 +35,9 @@ data class DayUiState(
     val resizeBlockStartMinute: Int? = null,
     val hideCompleted: Boolean = false,
     val viewMode: ViewMode = ViewMode.DIAL,
+    val accentArgb: Long = Appearance.DEFAULT_ACCENT,
+    val completedArgb: Long = Appearance.DEFAULT_COMPLETED,
+    val background: BackgroundConfig = BackgroundConfig.None,
     val showMovePicker: Boolean = false,
     val showDatePicker: Boolean = false,
     val dialHalf: DialHalf = DialHalf.AM,

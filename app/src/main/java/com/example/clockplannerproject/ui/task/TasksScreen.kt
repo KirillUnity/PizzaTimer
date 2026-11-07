@@ -75,6 +75,7 @@ import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
 import com.example.clockplannerproject.ui.chrome.PaperDateHeader
 import com.example.clockplannerproject.ui.stats.ReportCard
+import com.example.clockplannerproject.ui.stats.rememberReportImportLaunchers
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.PaperOutline
 import kotlinx.datetime.LocalDate
@@ -88,11 +89,14 @@ fun TasksRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     if (showEditorOverlays) {
         LaunchedEffect(viewModel) {
             viewModel.effect.collect { effect ->
                 when (effect) {
                     is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
+                    is TasksUiEffect.ShowMessageRes ->
+                        snackbarHostState.showSnackbar(context.getString(effect.resId))
                 }
             }
         }
@@ -144,6 +148,7 @@ fun TasksScreen(
                 title = stringResource(R.string.nav_tasks),
                 subtitle = null,
             )
+            PlanGoalEntry(onClick = { onIntent(TasksUiIntent.OpenPlan) })
             ProjectControls(
                 projects = state.availableProjects,
                 selected = state.selectedProject,
@@ -243,6 +248,10 @@ private fun TaskListRow(
     onMove: () -> Unit = {},
 ) {
     val colorCd = stringResource(R.string.cd_task_color, task.title)
+    val statusText = stringResource(statusLabel(task.status))
+    val importanceText = stringResource(importanceLabel(task.importance))
+    val statusCd = stringResource(R.string.cd_status_chip, statusText)
+    val importanceCd = stringResource(R.string.cd_importance_chip, importanceText)
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
@@ -299,17 +308,25 @@ private fun TaskListRow(
                 selected = false,
                 onClick = {},
                 label = { Text(stringResource(statusLabel(task.status))) },
+                modifier = Modifier.semantics {
+                    contentDescription = statusCd
+                },
             )
             InputChip(
                 selected = false,
                 onClick = {},
                 label = { Text(stringResource(importanceLabel(task.importance))) },
+                modifier = Modifier.semantics {
+                    contentDescription = importanceCd
+                },
             )
             task.normalizedProject?.let { project ->
+                val projectCd = stringResource(R.string.cd_project_chip, project)
                 InputChip(
                     selected = false,
                     onClick = {},
                     label = { Text(project) },
+                    modifier = Modifier.semantics { contentDescription = projectCd },
                 )
             }
         }
@@ -424,6 +441,8 @@ fun TaskEditorOverlays(
             onDismiss = { onIntent(TasksUiIntent.DismissMove) },
         )
     }
+
+    PlanSheetHost(state = state, onIntent = onIntent)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -472,6 +491,9 @@ private fun TaskEditorSheet(
     reportDraft: String = "",
     onIntent: (TasksUiIntent) -> Unit,
 ) {
+    val launchers = rememberReportImportLaunchers { id, uri ->
+        onIntent(TasksUiIntent.ImportReportAttachment(id, uri))
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = { onIntent(TasksUiIntent.DismissEditor) },
@@ -656,6 +678,11 @@ private fun TaskEditorSheet(
                     ReportCard(
                         report = report,
                         onClick = { onIntent(TasksUiIntent.EditReport(report)) },
+                        onPickImage = { launchers.pickImage(report.id) },
+                        onPickFile = { launchers.pickFile(report.id) },
+                        onRemoveAttachment = {
+                            onIntent(TasksUiIntent.RemoveReportAttachment(report.id))
+                        },
                         modifier = Modifier.padding(vertical = 4.dp),
                     )
                 }
@@ -775,10 +802,13 @@ private fun ImportanceRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Importance.entries.forEach { level ->
+            val label = stringResource(importanceLabel(level))
+            val description = stringResource(R.string.cd_importance_chip, label)
             FilterChip(
                 selected = selected == level,
                 onClick = { onSelect(level) },
-                label = { Text(stringResource(importanceLabel(level))) },
+                label = { Text(label) },
+                modifier = Modifier.semantics { contentDescription = description },
             )
         }
     }
@@ -810,7 +840,8 @@ private fun IntervalRow(
                 Text(
                     text = stringResource(
                         R.string.task_end_value,
-                        block.endMinute?.let { TimeMath.formatMinuteOfDay(it) } ?: "…",
+                        block.endMinute?.let { TimeMath.formatMinuteOfDay(it) }
+                            ?: stringResource(R.string.report_preview_empty),
                     ),
                 )
             }
@@ -886,6 +917,8 @@ private fun RecurrenceEditor(
         ) {
             DayOfWeek.entries.forEach { day ->
                 val selected = day in rule.days
+                val label = java.time.DayOfWeek.valueOf(day.name)
+                    .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
                 FilterChip(
                     selected = selected,
                     onClick = {
@@ -894,7 +927,8 @@ private fun RecurrenceEditor(
                             if (next.isEmpty()) RecurrenceRule.None else RecurrenceRule.Weekdays(next),
                         )
                     },
-                    label = { Text(day.name.take(3)) },
+                    label = { Text(label) },
+                    modifier = Modifier.semantics { contentDescription = label },
                 )
             }
         }
