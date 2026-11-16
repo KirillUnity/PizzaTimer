@@ -10,6 +10,7 @@ import com.example.clockplannerproject.kit.core.mvi.UiEffect
 import com.example.clockplannerproject.kit.core.mvi.UiIntent
 import com.example.clockplannerproject.kit.core.mvi.UiState
 import com.example.clockplannerproject.kit.core.time.TaskResize
+import com.example.clockplannerproject.ui.day.flow.PauseMood
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 
@@ -41,6 +42,14 @@ data class DayUiState(
     val showMovePicker: Boolean = false,
     val showDatePicker: Boolean = false,
     val dialHalf: DialHalf = DialHalf.AM,
+    /** Pause slip is open. The closed interval is already stored. */
+    val pauseSlipOpen: Boolean = false,
+    val pauseDraft: String = "",
+    val pauseMood: PauseMood = PauseMood.Calm,
+    /** Text for the resume chip. Null hides the chip. */
+    val resumeCheckpoint: String? = null,
+    /** Day-close card under the dial. */
+    val showDayClose: Boolean = false,
 ) : UiState {
     val taskCount: Int get() = tasks.size
     val hasUserRotation: Boolean get() = kotlin.math.abs(userRotationOffsetDeg) > 0.5f
@@ -111,6 +120,14 @@ sealed interface DayUiIntent : UiIntent {
     data object DismissDatePicker : DayUiIntent
     data class SelectDate(val date: LocalDate) : DayUiIntent
     data class SetDialHalf(val half: DialHalf) : DayUiIntent
+    data class ChangePauseDraft(val text: String) : DayUiIntent
+    data class SelectPauseMood(val mood: PauseMood) : DayUiIntent
+    /** Stores the slip text and closes it. Does not edit closed blocks. */
+    data object CommitPause : DayUiIntent
+    /** Closes the slip. Does not edit closed blocks. */
+    data object SkipPause : DayUiIntent
+    data object ShowDayClose : DayUiIntent
+    data object DismissDayClose : DayUiIntent
 }
 
 sealed interface DayUiEffect : UiEffect {

@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
@@ -30,7 +31,9 @@ fun AmPmRow(
     modifier: Modifier = Modifier,
 ) {
     val halves = DialHalf.entries
-    SingleChoiceSegmentedButtonRow(modifier = modifier.padding(start = 12.dp, end = 4.dp)) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier.padding(start = 4.dp, end = 4.dp),
+    ) {
         halves.forEachIndexed { index, half ->
             val label = stringResource(
                 if (half == DialHalf.AM) R.string.dial_am else R.string.dial_pm,
@@ -44,7 +47,12 @@ fun AmPmRow(
                 shape = SegmentedButtonDefaults.itemShape(index, halves.size),
                 modifier = Modifier.semantics { contentDescription = description },
             ) {
-                Text(text = label)
+                Text(
+                    text = label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                )
             }
         }
     }

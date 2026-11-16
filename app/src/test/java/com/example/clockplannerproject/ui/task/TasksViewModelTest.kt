@@ -173,6 +173,27 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun update_persistsCustomTags_andFilterNarrows() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.Create)
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Read"))
+        viewModel.onIntent(TasksUiIntent.AddTag("  дома  "))
+        viewModel.onIntent(TasksUiIntent.ChangeTagDraft("учёба"))
+        viewModel.onIntent(TasksUiIntent.AddTag("учёба"))
+        viewModel.onIntent(TasksUiIntent.AddTag("дома"))
+        viewModel.onIntent(TasksUiIntent.AddTag("   "))
+        viewModel.onIntent(TasksUiIntent.Update)
+        assertEquals(listOf("дома", "учёба"), viewModel.state.value.tasks.single().tags)
+
+        viewModel.onIntent(TasksUiIntent.Create)
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Other"))
+        viewModel.onIntent(TasksUiIntent.Update)
+        viewModel.onIntent(TasksUiIntent.FilterByTag("УЧЁБА"))
+        assertEquals(listOf("Read"), viewModel.state.value.visibleTasks.map { it.title })
+        assertEquals(listOf("дома", "учёба"), viewModel.state.value.availableTags)
+    }
+
+    @Test
     fun update_persistsOneNormalizedProject() {
         val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
         viewModel.onIntent(TasksUiIntent.Create)

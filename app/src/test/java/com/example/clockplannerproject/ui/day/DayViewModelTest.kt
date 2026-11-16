@@ -8,6 +8,7 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.ViewMode
+import com.example.clockplannerproject.ui.day.flow.PauseMood
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -202,6 +204,25 @@ class DayViewModelTest {
         val paused = later.state.value.tasks.single()
         assertEquals(TimeBlock(9 * 60, 12 * 60), paused.blocks.first())
         assertEquals(TimeBlock(12 * 60, 13 * 60), paused.blocks.last())
+    }
+
+    @Test
+    fun pause_opensSlip_commitKeepsClosedBlocks() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single()
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        assertTrue(later.state.value.pauseSlipOpen)
+        val paused = later.state.value.tasks.single()
+        later.onIntent(DayUiIntent.ChangePauseDraft("цифры за четверг"))
+        later.onIntent(DayUiIntent.SelectPauseMood(PauseMood.Deep))
+        later.onIntent(DayUiIntent.CommitPause)
+        assertFalse(later.state.value.pauseSlipOpen)
+        assertEquals("цифры за четверг", later.state.value.resumeCheckpoint)
+        assertEquals(paused.blocks, later.state.value.tasks.single().blocks)
     }
 
     @Test

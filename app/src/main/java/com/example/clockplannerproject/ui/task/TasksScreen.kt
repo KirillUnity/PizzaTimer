@@ -13,27 +13,33 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -41,10 +47,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +61,9 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,9 +74,12 @@ import com.example.clockplannerproject.kit.core.RecurrenceRule
 import kotlinx.datetime.DayOfWeek
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskDraftError
+import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskPalette
 import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
+import com.example.clockplannerproject.kit.core.taskAppearances
+import com.example.clockplannerproject.kit.core.time.TaskResize
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
@@ -139,58 +149,45 @@ fun TasksScreen(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            PaperDateHeader(
-                date = state.date,
-                onPrevious = { onIntent(TasksUiIntent.PreviousDay) },
-                onNext = { onIntent(TasksUiIntent.NextDay) },
-                onPickDate = { onIntent(TasksUiIntent.OpenDatePicker) },
-                title = stringResource(R.string.nav_tasks),
-                subtitle = null,
-            )
-            PlanGoalEntry(onClick = { onIntent(TasksUiIntent.OpenPlan) })
-            ProjectControls(
-                projects = state.availableProjects,
-                selected = state.selectedProject,
-                search = state.projectSearch,
-                onSearch = { onIntent(TasksUiIntent.ChangeProjectSearch(it)) },
-                onClearSearch = { onIntent(TasksUiIntent.ClearProjectSearch) },
-                onSelect = { onIntent(TasksUiIntent.FilterByProject(it)) },
-            )
-            state.errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(16.dp),
+        ResponsiveTaskGrid(
+            tasks = state.visibleTasks,
+            showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessage == null,
+            onEdit = { onIntent(TasksUiIntent.Edit(it)) },
+            header = {
+                PaperDateHeader(
+                    date = state.date,
+                    onPrevious = { onIntent(TasksUiIntent.PreviousDay) },
+                    onNext = { onIntent(TasksUiIntent.NextDay) },
+                    onPickDate = { onIntent(TasksUiIntent.OpenDatePicker) },
+                    title = stringResource(R.string.nav_tasks),
+                    subtitle = null,
                 )
-            }
-            if (!state.isLoading && state.visibleTasks.isEmpty() && state.errorMessage == null) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.tasks_empty),
-                        style = MaterialTheme.typography.bodyLarge,
+                PlanGoalEntry(onClick = { onIntent(TasksUiIntent.OpenPlan) })
+                ProjectControls(
+                    projects = state.availableProjects,
+                    selected = state.selectedProject,
+                    search = state.projectSearch,
+                    onSearch = { onIntent(TasksUiIntent.ChangeProjectSearch(it)) },
+                    onClearSearch = { onIntent(TasksUiIntent.ClearProjectSearch) },
+                    onSelect = { onIntent(TasksUiIntent.FilterByProject(it)) },
+                )
+                if (state.availableTags.isNotEmpty() || state.selectedTag != null) {
+                    TagFilterRow(
+                        tags = state.availableTags,
+                        selected = state.selectedTag,
+                        onSelect = { onIntent(TasksUiIntent.FilterByTag(it)) },
                     )
                 }
-            } else {
-                ResponsiveTaskGrid(
-                    tasks = state.visibleTasks,
-                    onEdit = { onIntent(TasksUiIntent.Edit(it)) },
-                    onDelete = { onIntent(TasksUiIntent.Delete(it)) },
-                    onDuplicate = { onIntent(TasksUiIntent.Duplicate(it)) },
-                    onMove = {
-                        if (it.date == null) onIntent(TasksUiIntent.MoveToDiagram(it))
-                        else onIntent(TasksUiIntent.RequestMove(it))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+                state.errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -205,10 +202,9 @@ fun TasksScreen(
 @Composable
 private fun ResponsiveTaskGrid(
     tasks: List<Task>,
+    showEmpty: Boolean,
     onEdit: (Task) -> Unit,
-    onDelete: (Task) -> Unit,
-    onDuplicate: (Task) -> Unit,
-    onMove: (Task) -> Unit,
+    header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -216,23 +212,36 @@ private fun ResponsiveTaskGrid(
         val horizontalPadding = if (maxWidth >= 840.dp) 32.dp else 16.dp
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
-            contentPadding = PaddingValues(
-                start = horizontalPadding,
-                top = 8.dp,
-                end = horizontalPadding,
-                bottom = 96.dp,
-            ),
+            contentPadding = PaddingValues(top = 8.dp, bottom = TasksListBottomClearance),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(tasks, key = { it.id.value }) { task ->
-                TaskListRow(
-                    task = task,
-                    onEdit = { onEdit(task) },
-                    onDelete = { onDelete(task) },
-                    onDuplicate = { onDuplicate(task) },
-                    onMove = { onMove(task) },
-                )
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                header()
+            }
+            if (showEmpty) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = stringResource(R.string.tasks_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = horizontalPadding, vertical = 24.dp),
+                    )
+                }
+            } else {
+                items(
+                    taskAppearances(tasks),
+                    key = { "${it.task.id.value}:${it.blockIndex ?: "untimed"}" },
+                ) { row ->
+                    TaskListRow(
+                        task = row.task,
+                        block = row.block,
+                        onEdit = { onEdit(row.task) },
+                        modifier = Modifier.padding(horizontal = horizontalPadding),
+                    )
+                }
             }
         }
     }
@@ -243,18 +252,22 @@ private fun ResponsiveTaskGrid(
 private fun TaskListRow(
     task: Task,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit = {},
-    onMove: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    block: TimeBlock? = task.blocks.firstOrNull(),
 ) {
     val colorCd = stringResource(R.string.cd_task_color, task.title)
     val statusText = stringResource(statusLabel(task.status))
     val importanceText = stringResource(importanceLabel(task.importance))
     val statusCd = stringResource(R.string.cd_status_chip, statusText)
     val importanceCd = stringResource(R.string.cd_importance_chip, importanceText)
+    val whenText = if (block == null) {
+        stringResource(R.string.task_row_untimed)
+    } else {
+        TimeMath.formatRange(block.startMinute, block.endMinute)
+    }
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
@@ -275,81 +288,47 @@ private fun TaskListRow(
                     .weight(1f)
                     .padding(start = 12.dp),
             ) {
-                Text(text = task.title, style = MaterialTheme.typography.titleMedium)
-                if (task.date == null) {
-                    Text(
-                        text = stringResource(R.string.task_backlog),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else if (task.isUntimed) {
-                    Text(
-                        text = stringResource(R.string.task_untimed),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    task.blocks.forEach { block ->
-                        Text(
-                            text = TimeMath.formatRange(block.startMinute, block.endMinute),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-        FlowRow(
-            modifier = Modifier.padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            InputChip(
-                selected = false,
-                onClick = {},
-                label = { Text(stringResource(statusLabel(task.status))) },
-                modifier = Modifier.semantics {
-                    contentDescription = statusCd
-                },
-            )
-            InputChip(
-                selected = false,
-                onClick = {},
-                label = { Text(stringResource(importanceLabel(task.importance))) },
-                modifier = Modifier.semantics {
-                    contentDescription = importanceCd
-                },
-            )
-            task.normalizedProject?.let { project ->
-                val projectCd = stringResource(R.string.cd_project_chip, project)
-                InputChip(
-                    selected = false,
-                    onClick = {},
-                    label = { Text(project) },
-                    modifier = Modifier.semantics { contentDescription = projectCd },
-                )
-            }
-        }
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(onClick = onMove) {
                 Text(
-                    stringResource(
-                        if (task.date == null) R.string.task_move_to_diagram else R.string.task_move,
-                    ),
+                    text = statusText,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = statusCd },
+                )
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = whenText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = importanceText,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.semantics { contentDescription = importanceCd },
                 )
             }
-            TextButton(onClick = onDuplicate) {
-                Text(stringResource(R.string.task_duplicate))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.cd_delete_task, task.title),
-                )
+        }
+        if (task.normalizedTags.isNotEmpty()) {
+            FlowRow(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                task.normalizedTags.forEach { tag ->
+                    val label = hashTag(tag)
+                    val tagCd = stringResource(R.string.cd_task_tag, label)
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = true,
+                        modifier = Modifier.semantics { contentDescription = tagCd },
+                    )
+                }
             }
         }
     }
@@ -372,38 +351,11 @@ fun TaskEditorOverlays(
         if (date != null) {
             TaskEditorSheet(
                 editor = editor,
-                date = date,
                 nowMinute = state.nowMinute,
                 reports = state.reports,
                 reportDraft = state.reportDraft,
+                knownTags = state.availableTags,
                 onIntent = onIntent,
-            )
-        }
-    }
-
-    val picker = state.timePicker
-    val editorForPicker = state.editor
-    if (picker != null && editorForPicker != null) {
-        val block = editorForPicker.blocks.getOrNull(picker.blockIndex)
-        if (block != null) {
-            ClockTimePickerDialog(
-                minuteOfDay = if (picker.isStart) {
-                    block.startMinute
-                } else {
-                    block.endMinute ?: block.startMinute
-                },
-                title = stringResource(
-                    if (picker.isStart) R.string.task_start else R.string.task_end,
-                ),
-                onConfirm = { picked ->
-                    if (picker.isStart) {
-                        onIntent(TasksUiIntent.ChangeBlockStart(picker.blockIndex, picked))
-                    } else {
-                        onIntent(TasksUiIntent.ChangeBlockEnd(picker.blockIndex, picked))
-                    }
-                    onIntent(TasksUiIntent.DismissTimePicker)
-                },
-                onDismiss = { onIntent(TasksUiIntent.DismissTimePicker) },
             )
         }
     }
@@ -481,14 +433,14 @@ private fun TaskDatePickerDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TaskEditorSheet(
     editor: TaskEditorState,
-    date: LocalDate,
     nowMinute: Int,
     reports: List<com.example.clockplannerproject.kit.core.TaskReport> = emptyList(),
     reportDraft: String = "",
+    knownTags: List<String> = emptyList(),
     onIntent: (TasksUiIntent) -> Unit,
 ) {
     val launchers = rememberReportImportLaunchers { id, uri ->
@@ -502,14 +454,18 @@ private fun TaskEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight()
+                .navigationBarsPadding(),
+        ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 16.dp),
         ) {
             Text(
-                text = stringResource(
-                    if (editor.isNew) R.string.task_editor_create else R.string.task_editor_edit,
-                ),
+                text = stringResource(R.string.task_editor_title),
                 style = MaterialTheme.typography.titleLarge,
             )
             Spacer(Modifier.height(16.dp))
@@ -582,6 +538,15 @@ private fun TaskEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
+            TagEditor(
+                tags = editor.tags,
+                draft = editor.tagDraft,
+                knownTags = knownTags,
+                onDraft = { onIntent(TasksUiIntent.ChangeTagDraft(it)) },
+                onAdd = { onIntent(TasksUiIntent.AddTag(it)) },
+                onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
+            )
+            Spacer(Modifier.height(12.dp))
             FilterChip(
                 selected = editor.scheduledDate == null,
                 onClick = {
@@ -589,65 +554,14 @@ private fun TaskEditorSheet(
                 },
                 label = { Text(stringResource(R.string.task_backlog_toggle)) },
             )
-            if (editor.scheduledDate != null) {
-                Spacer(Modifier.height(12.dp))
-                RecurrenceEditor(
-                    rule = editor.recurrence,
-                    onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
-                )
-            }
             Spacer(Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.task_intervals),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            if (editor.blocks.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.task_untimed_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            editor.blocks.forEachIndexed { index, block ->
-                val closed = block.isClosed(nowMinute)
-                val end = block.endMinute
-                IntervalRow(
-                    block = block,
-                    readOnly = closed,
-                    overnight = end != null &&
-                        end != TimeMath.MINUTES_PER_DAY &&
-                        end.mod(TimeMath.MINUTES_PER_DAY) <
-                        block.startMinute.mod(TimeMath.MINUTES_PER_DAY),
-                    onStart = { onIntent(TasksUiIntent.OpenStartPicker(index)) },
-                    onEnd = { onIntent(TasksUiIntent.OpenEndPicker(index)) },
-                    onRemove = { onIntent(TasksUiIntent.RemoveBlock(index)) },
-                )
-            }
-            if (editor.error is TaskDraftError.EndEqualsStart) {
-                Text(
-                    text = stringResource(R.string.task_error_end_equals_start),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onIntent(TasksUiIntent.AddBlock) }) {
-                    Text(stringResource(R.string.task_add_interval))
-                }
-                if (editor.blocks.isNotEmpty()) {
-                    TextButton(onClick = { onIntent(TasksUiIntent.ClearTime) }) {
-                        Text(stringResource(R.string.task_clear_time))
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.task_status),
                 style = MaterialTheme.typography.labelLarge,
             )
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 TaskStatus.entries.forEach { status ->
                     FilterChip(
@@ -657,7 +571,95 @@ private fun TaskEditorSheet(
                     )
                 }
             }
+            Spacer(Modifier.height(16.dp))
+            if (editor.blocks.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.task_untimed_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.task_intervals),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                editor.blocks.forEachIndexed { index, block ->
+                    val closed = block.isClosed(nowMinute)
+                    val end = block.endMinute
+                    IntervalRow(
+                        block = block,
+                        readOnly = closed,
+                        overnight = end != null &&
+                            end != TimeMath.MINUTES_PER_DAY &&
+                            end.mod(TimeMath.MINUTES_PER_DAY) <
+                            block.startMinute.mod(TimeMath.MINUTES_PER_DAY),
+                        onEndEarlier = {
+                            onIntent(
+                                TasksUiIntent.ChangeBlockEnd(
+                                    index,
+                                    endAfterStep(block, -EndStepMinutes),
+                                ),
+                            )
+                        },
+                        onEndLater = {
+                            onIntent(
+                                TasksUiIntent.ChangeBlockEnd(
+                                    index,
+                                    endAfterStep(block, EndStepMinutes),
+                                ),
+                            )
+                        },
+                    )
+                }
+            }
+            if (editor.error is TaskDraftError.EndEqualsStart) {
+                Text(
+                    text = stringResource(R.string.task_error_end_equals_start),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            TextButton(
+                onClick = { onIntent(TasksUiIntent.AddBlock) },
+                modifier = Modifier.height(48.dp),
+            ) {
+                Text(stringResource(R.string.task_add_interval))
+            }
+            if (editor.scheduledDate != null) {
+                Spacer(Modifier.height(8.dp))
+                RecurrenceEditor(
+                    rule = editor.recurrence,
+                    onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+                )
+            }
             if (!editor.isNew) {
+                Spacer(Modifier.height(8.dp))
+                EditorAction(
+                    label = stringResource(
+                        if (editor.scheduledDate == null) {
+                            R.string.task_move_to_diagram
+                        } else {
+                            R.string.task_move
+                        },
+                    ),
+                    onClick = {
+                        val task = editor.toTask()
+                        if (task.date == null) {
+                            onIntent(TasksUiIntent.MoveToDiagram(task))
+                        } else {
+                            onIntent(TasksUiIntent.RequestMove(task))
+                        }
+                    },
+                )
+                EditorAction(
+                    label = stringResource(R.string.task_duplicate),
+                    onClick = { onIntent(TasksUiIntent.Duplicate(editor.toTask())) },
+                )
+                EditorAction(
+                    label = stringResource(R.string.task_delete),
+                    onClick = { onIntent(TasksUiIntent.Delete(editor.toTask())) },
+                    destructive = true,
+                )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.task_reports),
@@ -687,57 +689,20 @@ private fun TaskEditorSheet(
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+        }
+            Button(
+                onClick = { onIntent(TasksUiIntent.Update) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp)
+                    .height(48.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             ) {
-                if (!editor.isNew) {
-                    TextButton(
-                        onClick = { onIntent(TasksUiIntent.Delete(editor.toTask())) },
-                    ) {
-                        Text(stringResource(R.string.task_delete))
-                    }
-                }
-                TextButton(onClick = { onIntent(TasksUiIntent.Update) }) {
-                    Text(stringResource(R.string.task_save))
-                }
+                Text(stringResource(R.string.task_save))
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClockTimePickerDialog(
-    minuteOfDay: Int,
-    title: String,
-    onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val normalized = minuteOfDay.mod(TimeMath.MINUTES_PER_DAY)
-    val pickerState = rememberTimePickerState(
-        initialHour = normalized / 60,
-        initialMinute = normalized % 60,
-        is24Hour = true,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { TimePicker(state = pickerState) },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(pickerState.hour * 60 + pickerState.minute) },
-            ) {
-                Text(stringResource(R.string.task_picker_ok))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.task_picker_cancel))
-            }
-        },
-    )
 }
 
 @Composable
@@ -787,6 +752,113 @@ private fun ProjectControls(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagFilterRow(
+    tags: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text(stringResource(R.string.task_tags_all)) },
+        )
+        tags.forEach { tag ->
+            val label = hashTag(tag)
+            val selectedTag = selected.equals(tag, ignoreCase = true)
+            FilterChip(
+                selected = selectedTag,
+                onClick = { onSelect(if (selectedTag) null else tag) },
+                label = { Text(label, softWrap = true) },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagEditor(
+    tags: List<String>,
+    draft: String,
+    knownTags: List<String>,
+    onDraft: (String) -> Unit,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.task_tags),
+        style = MaterialTheme.typography.labelLarge,
+    )
+    if (tags.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            tags.forEach { tag ->
+                val removeCd = stringResource(R.string.cd_remove_tag, tag)
+                InputChip(
+                    selected = true,
+                    onClick = { onRemove(tag) },
+                    label = { Text(tag) },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = removeCd,
+                        )
+                    },
+                )
+            }
+        }
+    }
+    val suggestions = knownTags.filter { known ->
+        tags.none { it.equals(known, ignoreCase = true) }
+    }
+    if (suggestions.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            suggestions.forEach { tag ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onAdd(tag) },
+                    label = { Text(tag) },
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = onDraft,
+            label = { Text(stringResource(R.string.task_tag_add)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onAdd(draft) }),
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(
+            onClick = { onAdd(draft) },
+            enabled = draft.isNotBlank(),
+        ) {
+            Text(stringResource(R.string.task_tag_confirm))
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ImportanceRow(
     selected: Importance,
@@ -797,9 +869,9 @@ private fun ImportanceRow(
         style = MaterialTheme.typography.labelLarge,
     )
     Spacer(Modifier.height(8.dp))
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Importance.entries.forEach { level ->
             val label = stringResource(importanceLabel(level))
@@ -815,53 +887,87 @@ private fun ImportanceRow(
 }
 
 @Composable
+private fun EditorAction(
+    label: String,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+    ) {
+        Text(
+            text = label,
+            color = if (destructive) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            textAlign = TextAlign.Start,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * One civil segment. A closed block is text and a lock only.
+ * An open block can move its end in [EndStepMinutes] steps.
+ */
+@Composable
 private fun IntervalRow(
     block: TimeBlock,
     readOnly: Boolean,
     overnight: Boolean,
-    onStart: () -> Unit,
-    onEnd: () -> Unit,
-    onRemove: () -> Unit,
+    onEndEarlier: () -> Unit,
+    onEndLater: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            TextButton(onClick = onStart, enabled = !readOnly) {
-                Text(
-                    text = stringResource(
-                        R.string.task_start_value,
-                        TimeMath.formatMinuteOfDay(block.startMinute),
-                    ),
+    val range = TimeMath.formatRange(block.startMinute, block.endMinute)
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (readOnly) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onEnd, enabled = !readOnly) {
-                Text(
-                    text = stringResource(
-                        R.string.task_end_value,
-                        block.endMinute?.let { TimeMath.formatMinuteOfDay(it) }
-                            ?: stringResource(R.string.report_preview_empty),
-                    ),
-                )
-            }
-            if (!readOnly) {
-                TextButton(onClick = onRemove) {
-                    Text(stringResource(R.string.task_remove_interval))
+            Text(
+                text = range,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        if (readOnly) {
+            Text(
+                text = stringResource(R.string.task_interval_locked),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onEndEarlier,
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Text(stringResource(R.string.task_end_earlier))
                 }
-            } else {
-                Text(
-                    text = stringResource(R.string.task_interval_locked),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
+                TextButton(
+                    onClick = onEndLater,
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Text(stringResource(R.string.task_end_later))
+                }
             }
         }
         if (overnight) {
             Text(
                 text = stringResource(R.string.task_overnight_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -935,6 +1041,28 @@ private fun RecurrenceEditor(
     }
 }
 
+private const val EndStepMinutes: Int = 15
+
+/** Clears the tasks FAB so the last card stays fully on screen. */
+private val TasksListBottomClearance = 128.dp
+
+private fun hashTag(tag: String): String =
+    if (tag.startsWith("#")) tag else "#$tag"
+
+/**
+ * New civil end after a ±[EndStepMinutes] step. Closed blocks never call this.
+ */
+private fun endAfterStep(block: TimeBlock, deltaMinutes: Int): Int {
+    val originalEnd = block.endMinute ?: (block.startMinute + EndStepMinutes)
+    return TaskResize.endMinuteAfterDelta(
+        startMinute = block.startMinute,
+        originalEndMinute = originalEnd,
+        deltaMinutes = deltaMinutes.toFloat(),
+        snapMinutes = EndStepMinutes,
+        minDuration = EndStepMinutes,
+    )
+}
+
 private fun importanceLabel(importance: Importance): Int = when (importance) {
     Importance.HIGH -> R.string.task_importance_high
     Importance.MEDIUM -> R.string.task_importance_medium
@@ -986,6 +1114,63 @@ private fun TasksScreenEmptyPreview() {
             state = TasksUiState(
                 date = PreviewDate,
                 isLoading = false,
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Tasks inventory", widthDp = 390, heightDp = 844)
+@Composable
+private fun TasksInventoryPreview() {
+    ClockPlannerProjectTheme {
+        TasksScreen(
+            state = TasksUiState(
+                date = PreviewDate,
+                tasks = listOf(
+                    SampleTasks.sportTwoBlocks(PreviewDate),
+                    Task(
+                        id = TaskId("design"),
+                        title = "Полировка интерфейса",
+                        colorArgb = 0xFF2E7D52,
+                        date = PreviewDate,
+                        importance = Importance.HIGH,
+                        tags = listOf("Дизайн"),
+                    ),
+                ),
+                isLoading = false,
+                nowMinute = 10 * 60,
+            ),
+            showEditorOverlays = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Timed editor", widthDp = 390, heightDp = 844)
+@Composable
+private fun TimedEditorPreview() {
+    ClockPlannerProjectTheme {
+        TasksScreen(
+            state = TasksUiState(
+                date = PreviewDate,
+                tasks = listOf(SampleTasks.sportTwoBlocks(PreviewDate)),
+                editor = TaskEditorState.from(SampleTasks.sportTwoBlocks(PreviewDate)),
+                isLoading = false,
+                nowMinute = 10 * 60,
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Untimed editor", widthDp = 390, heightDp = 844)
+@Composable
+private fun UntimedEditorPreview() {
+    ClockPlannerProjectTheme {
+        TasksScreen(
+            state = TasksUiState(
+                date = PreviewDate,
+                editor = TaskEditorState(scheduledDate = PreviewDate),
+                isLoading = false,
+                nowMinute = 10 * 60,
             ),
         )
     }

@@ -3,6 +3,7 @@ package com.example.clockplannerproject.kit.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.graphics.Color
@@ -22,11 +23,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.OnTerracotta
+import com.example.clockplannerproject.ui.theme.PaperInk
+import com.example.clockplannerproject.ui.theme.PaperSecondary
 import com.example.clockplannerproject.ui.theme.TerracottaNow
 import kotlinx.datetime.LocalTime
 
@@ -104,7 +109,7 @@ fun LiveChronoHole(
     now: LocalTime?,
     modifier: Modifier = Modifier,
 ) {
-    val clockText = now?.let { TimeMath.formatHm(it) }
+    val clockText = now?.let { wallClock(it) }
         ?: stringResource(R.string.time_placeholder)
     val description = stringResource(R.string.cd_current_time, clockText)
     Column(
@@ -124,6 +129,100 @@ fun LiveChronoHole(
         )
     }
 }
+
+/**
+ * Running DIAL hole: flow label, elapsed, task title, session caption, and Pause.
+ * On a short hole the title and caption drop so elapsed and Pause stay visible.
+ *
+ * @param holeDiameter inner diameter of the ring, in dp
+ * @since 0.5.0
+ */
+@Composable
+fun RunningSessionHole(
+    taskTitle: String,
+    elapsed: String,
+    holeDiameter: Dp,
+    onPause: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pauseCd = stringResource(R.string.cd_timer_pause)
+    val showDetail = holeDiameter >= RoomForSessionDetail
+    val button = if (showDetail) SessionPauseButton else CompactPauseButton
+    Column(
+        modifier = modifier.widthIn(max = holeDiameter),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.dial_in_flow),
+            style = MaterialTheme.typography.labelSmall,
+            color = TerracottaNow,
+            maxLines = 1,
+            softWrap = false,
+        )
+        Text(
+            text = elapsed,
+            style = MaterialTheme.typography.headlineSmall,
+            color = PaperInk,
+            maxLines = 1,
+            softWrap = false,
+        )
+        if (showDetail) {
+            Text(
+                text = taskTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = PaperInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.dial_this_session),
+                style = MaterialTheme.typography.labelSmall,
+                color = PaperSecondary,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        FilledIconButton(
+            onClick = onPause,
+            modifier = Modifier.size(button),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = TerracottaNow,
+                contentColor = OnTerracotta,
+            ),
+        ) {
+            Icon(
+                imageVector = PauseBars,
+                contentDescription = pauseCd,
+            )
+        }
+        Text(
+            text = stringResource(R.string.timer_pause),
+            style = MaterialTheme.typography.labelSmall,
+            color = TerracottaNow,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/** Wall time for the idle hole, hours and minutes. */
+internal fun wallClock(time: LocalTime): String =
+    "%02d:%02d".format(time.hour, time.minute)
+
+/**
+ * Elapsed civil time of the open block, `HH:MM`.
+ *
+ * @since 0.5.0
+ */
+internal fun formatSessionElapsed(startMinute: Int, nowMinute: Int): String {
+    val minutes = TimeMath.durationMinutes(startMinute, nowMinute)
+    return "%02d:%02d".format(minutes / 60, minutes % 60)
+}
+
+private val RoomForSessionDetail = 160.dp
+private val SessionPauseButton = 56.dp
+private val CompactPauseButton = 48.dp
 
 /** Two bars; [Icons.Filled.Pause] lives in material-icons-extended, which this module does not use. */
 private val PauseBars: ImageVector = ImageVector.Builder(

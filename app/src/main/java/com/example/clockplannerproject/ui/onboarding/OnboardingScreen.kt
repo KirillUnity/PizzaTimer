@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
@@ -58,7 +61,12 @@ fun OnboardingScreen(
                 .fillMaxWidth(),
         ) { page ->
             val (titleRes, bodyRes) = pages[page]
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Text(
                     text = stringResource(titleRes),
                     style = MaterialTheme.typography.headlineSmall,
@@ -76,9 +84,15 @@ fun OnboardingScreen(
             val skipCd = stringResource(R.string.cd_onboarding_skip)
             TextButton(
                 onClick = onFinished,
-                modifier = Modifier.semantics { contentDescription = skipCd },
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = skipCd },
             ) {
-                Text(stringResource(R.string.onboarding_skip))
+                Text(
+                    text = stringResource(R.string.onboarding_skip),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             val nextCd = stringResource(
                 if (lastPage) R.string.cd_onboarding_done else R.string.cd_onboarding_next,
@@ -91,12 +105,16 @@ fun OnboardingScreen(
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                     }
                 },
-                modifier = Modifier.semantics { contentDescription = nextCd },
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = nextCd },
             ) {
                 Text(
-                    stringResource(
+                    text = stringResource(
                         if (lastPage) R.string.onboarding_done else R.string.onboarding_next,
                     ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

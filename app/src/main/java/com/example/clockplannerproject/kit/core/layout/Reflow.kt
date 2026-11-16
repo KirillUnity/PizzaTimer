@@ -19,12 +19,13 @@ enum class ReflowMode {
     WallClock,
 
     /**
-     * DONE tasks are omitted first. Timed-only remaining work is scaled so
-     * sweeps fill 360°. When untimed tasks remain, timed slices stay civil
-     * and leftover (including minutes vacated by DONE) is packed with
-     * importance weights — not a list filter.
+     * Timed-only compact keeps remaining sectors on the face and paints
+     * completed minutes as **one** gray [TaskStatus.DONE] sector (several
+     * DONE tasks merge; weight is their summed duration). Those sweeps fill
+     * 360°. When untimed tasks remain, DONE is omitted and its minutes join
+     * leftover, packed with importance weights — not a list filter.
      *
-     * Sector angle in timed-only compact is **share of remaining work**,
+     * Sector angle in timed-only compact is a **share of that weight**,
      * not wall-clock hours. Labels must still show real start–end. The now
      * chevron stays at 12 as "now" and is not bound to a sector.
      */
@@ -70,7 +71,7 @@ object Reflow {
         val timed = pool.filterNot { it.isUntimed }
         val untimed = pool.filter { it.isUntimed }
         if (mode == ReflowMode.CompactRemaining && untimed.isEmpty()) {
-            return compact(timed, half)
+            return compact(timed, half, real)
         }
         val timedSlices = timed.flatMap { task ->
             clipTaskToHalf(task, half).map { slice ->
@@ -159,35 +160,68 @@ object Reflow {
         return out
     }
 
-    private fun compact(tasks: List<Task>, half: DialHalf): List<ReflowSlice> {
-        val visible = tasks
+    /**
+     * @param tasks non-done timed work already on [half]
+     * @param source full day, used to merge DONE clips into one sector
+     */
+    private fun compact(
+        tasks: List<Task>,
+        half: DialHalf,
+        source: List<Task>,
+    ): List<ReflowSlice> {
+        val pieces = mutableListOf<CompactPiece>()
+        tasks.flatMap { task -> clipTaskToHalf(task, half).map { slice -> task to slice } }
+            .forEach { (task, slice) ->
+                val weight = (slice.endMinute - slice.startMinute).coerceAtLeast(0)
+                if (weight > 0) pieces += CompactPiece(task, weight, slice.startMinute)
+            }
+        val doneClips = source
+            .filter { it.status == TaskStatus.DONE }
             .flatMap { task -> clipTaskToHalf(task, half).map { slice -> task to slice } }
-            .sortedBy { it.second.startMinute }
-        if (visible.isEmpty()) return emptyList()
-        val weights = visible.map { (_, slice) ->
+        val doneMinutes = doneClips.sumOf { (_, slice) ->
             (slice.endMinute - slice.startMinute).coerceAtLeast(0)
         }
-        val totalWeight = weights.sum()
+        if (doneMinutes > 0) {
+            val (seed, earliest) = doneClips.minBy { it.second.startMinute }
+            pieces += CompactPiece(
+                task = seed.copy(colorArgb = COMPLETED_SECTOR_ARGB),
+                weight = doneMinutes,
+                sortMinute = earliest.startMinute,
+            )
+        }
+        if (pieces.isEmpty()) return emptyList()
+        pieces.sortWith(
+            compareBy<CompactPiece> { it.sortMinute }
+                .thenBy { if (it.task.status == TaskStatus.DONE) 1 else 0 },
+        )
+        val totalWeight = pieces.sumOf { it.weight }
         if (totalWeight <= 0) return emptyList()
         var cursor = half.startMinute
         var remainingMinutes = TimeMath.MINUTES_PER_HALF
         var remainingWeight = totalWeight
-        return visible.mapIndexed { index, (task, _) ->
-            val weight = weights[index]
-            val share = if (index == visible.lastIndex) {
+        return pieces.mapIndexed { index, piece ->
+            val share = if (index == pieces.lastIndex) {
                 remainingMinutes
             } else {
-                (weight.toLong() * remainingMinutes / remainingWeight)
+                (piece.weight.toLong() * remainingMinutes / remainingWeight)
                     .toInt()
                     .coerceAtLeast(1)
-                    .coerceAtMost(remainingMinutes - (visible.size - 1 - index))
+                    .coerceAtMost(remainingMinutes - (pieces.size - 1 - index))
             }
             val start = cursor
             val end = start + share
             cursor = end
             remainingMinutes -= share
-            remainingWeight -= weight
-            ReflowSlice(task, start, end)
+            remainingWeight -= piece.weight
+            ReflowSlice(piece.task, start, end)
         }
     }
+
+    private data class CompactPiece(
+        val task: Task,
+        val weight: Int,
+        val sortMinute: Int,
+    )
+
+    private const val COMPLETED_SECTOR_ARGB: Long = 0xFF8E8B82
 }

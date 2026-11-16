@@ -8,7 +8,6 @@ import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReflowTest {
@@ -37,12 +36,15 @@ class ReflowTest {
             task("c", 11 * 60, 12 * 60, TaskStatus.DONE),
         )
         val slices = Reflow.layout(tasks, DialHalf.AM, ReflowMode.CompactRemaining)
-        assertEquals(2, slices.size)
+        assertEquals(3, slices.size)
         val sweep = slices.sumOf { slice ->
             TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute).toDouble()
         }
         assertEquals(360.0, sweep, 0.01)
-        assertTrue(slices.none { it.task.status == TaskStatus.DONE })
+        assertEquals(listOf("a", "b", "c"), slices.map { it.task.id.value })
+        assertEquals(1, slices.count { it.task.status == TaskStatus.DONE })
+        assertEquals(listOf(240, 240, 240), slices.map { it.endMinute - it.startMinute })
+        assertEquals(0xFF8E8B82, slices.single { it.task.status == TaskStatus.DONE }.task.colorArgb)
     }
 
     @Test
@@ -67,13 +69,37 @@ class ReflowTest {
     }
 
     @Test
-    fun compact_hidesDoneEntirely() {
+    fun compact_doneOnly_oneGraySectorFillsFace() {
         val slices = Reflow.layout(
             listOf(task("c", 9 * 60, 12 * 60, TaskStatus.DONE)),
             DialHalf.AM,
             ReflowMode.CompactRemaining,
         )
-        assertTrue(slices.isEmpty())
+        assertEquals(1, slices.size)
+        assertEquals(TaskStatus.DONE, slices.single().task.status)
+        assertEquals(0, slices.single().startMinute)
+        assertEquals(TimeMath.MINUTES_PER_HALF, slices.single().endMinute)
+        assertEquals(0xFF8E8B82, slices.single().task.colorArgb)
+    }
+
+    @Test
+    fun compact_mergesDoneIntoOneSector() {
+        val slices = Reflow.layout(
+            listOf(
+                task("early", 8 * 60, 9 * 60, TaskStatus.DONE),
+                task("mid", 9 * 60, 10 * 60),
+                task("late", 10 * 60, 11 * 60, TaskStatus.DONE),
+            ),
+            DialHalf.AM,
+            ReflowMode.CompactRemaining,
+        )
+        assertEquals(2, slices.size)
+        assertEquals(listOf("early", "mid"), slices.map { it.task.id.value })
+        val doneSpan = slices[0].endMinute - slices[0].startMinute
+        val midSpan = slices[1].endMinute - slices[1].startMinute
+        assertEquals(doneSpan, midSpan * 2)
+        val sweep = slices.sumOf { TimeMath.sliceSweepDeg(it.startMinute, it.endMinute).toDouble() }
+        assertEquals(360.0, sweep, 0.01)
     }
 
     @Test

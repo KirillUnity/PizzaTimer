@@ -2,7 +2,8 @@ package com.example.clockplannerproject.kit.compose
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,8 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
@@ -86,7 +89,12 @@ fun TaskBottomSheetBody(
             .heightIn(max = 280.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Text(text = task.title, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = task.title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             text = if (task.isUntimed) {
@@ -104,6 +112,14 @@ fun TaskBottomSheetBody(
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
+        if (task.normalizedTags.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = task.normalizedTags.joinToString(separator = " · "),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             text = stringResource(statusLabel(task.status)),
@@ -115,6 +131,7 @@ fun TaskBottomSheetBody(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TaskBottomSheetActions(
     isDone: Boolean,
@@ -135,9 +152,10 @@ fun TaskBottomSheetActions(
                 Text(stringResource(R.string.task_complete))
             }
         }
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TextButton(onClick = onMove) {
                 Text(stringResource(R.string.task_move))

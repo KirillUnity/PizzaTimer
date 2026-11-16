@@ -1,10 +1,13 @@
 package com.example.clockplannerproject.ui.task
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,9 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
@@ -52,6 +56,7 @@ import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
+import com.example.clockplannerproject.ui.theme.PaperOutline
 import kotlinx.datetime.LocalDate
 
 private const val WINDOW_STEP_MINUTES: Int = 30
@@ -75,7 +80,8 @@ internal fun PlanGoalEntry(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, PaperOutline, shape)
             .clickable(onClick = onClick)
             .semantics { contentDescription = description }
             .padding(16.dp),
@@ -89,13 +95,13 @@ internal fun PlanGoalEntry(
             Text(
                 text = stringResource(R.string.planner_entry_subtitle),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -494,10 +500,14 @@ private fun StatCell(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PlanStepRow(
     index: Int,
@@ -512,8 +522,16 @@ private fun PlanStepRow(
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(12.dp),
     ) {
-        Text(text = step.title, style = MaterialTheme.typography.titleMedium)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = step.title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             TextButton(onClick = { onIntent(TasksUiIntent.OpenPlanStepDate(index)) }) {
                 Text(
                     text = step.date?.let(::formatPlanDate)

@@ -31,6 +31,7 @@ class AppearanceCodecTest {
             accentArgb = AppearancePalette.ACCENT_EMERALD,
             completedArgb = AppearancePalette.COMPLETED_COOL,
             background = BackgroundConfig.Preset(BackgroundPresets.NIGHT_INK),
+            darkTheme = true,
         )
         val encoded = AppearanceCodec.encode(saved)
         val decoded = AppearanceCodec.decode(
@@ -41,7 +42,9 @@ class AppearanceCodecTest {
             presetName = encoded.presetName,
             colorArgb = encoded.colorArgb,
             userUri = encoded.userUri,
+            darkTheme = encoded.darkTheme,
         )
+        assertTrue(decoded.darkTheme)
         assertEquals(saved, decoded)
         assertTrue(decoded.background is BackgroundConfig.Preset)
     }

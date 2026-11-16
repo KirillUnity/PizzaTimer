@@ -46,9 +46,7 @@ fun clipTaskToHalf(task: Task, half: DialHalf): List<TaskSlice> =
     task.blocks.flatMap { block ->
         val civilEnd = block.endMinute ?: return@flatMap emptyList()
         unfoldTaskIntervals(block.startMinute, civilEnd).mapNotNull { (start, end) ->
-            val left = max(start, half.startMinute)
-            val right = min(end, half.endMinute)
-            if (right > left) TaskSlice(task, left, right) else null
+            sliceOnHalf(task, half, start, end)
         }
     }
 
@@ -81,9 +79,7 @@ fun resizableSlices(task: Task, half: DialHalf, nowMinute: Int): List<TaskSlice>
     return task.blocks.filterNot { it.isClosed(nowMinute) }.flatMap { block ->
         val civilEnd = block.endMinute ?: return@flatMap emptyList()
         unfoldTaskIntervals(block.startMinute, civilEnd).mapNotNull { (start, end) ->
-            val left = max(start, half.startMinute)
-            val right = min(end, half.endMinute)
-            if (right > left) TaskSlice(task, left, right) else null
+            sliceOnHalf(task, half, start, end)
         }
     }
 }
@@ -108,13 +104,29 @@ fun halfAnchorMinute(nowMinute: Float, half: DialHalf, tasks: List<Task>): Float
  * Exclusive midnight [TimeMath.MINUTES_PER_DAY] stays on the PM face
  * (`22:00–24:00`) and is not re-wrapped as a new overnight task.
  */
+private fun sliceOnHalf(
+    task: Task,
+    half: DialHalf,
+    start: Int,
+    end: Int,
+): TaskSlice? {
+    val left = max(start, half.startMinute)
+    val right = min(end, half.endMinute)
+    return when {
+        right > left -> TaskSlice(task, left, right)
+        start == end && left == start && left >= half.startMinute && left < half.endMinute ->
+            TaskSlice(task, left, left)
+        else -> null
+    }
+}
+
 internal fun unfoldTaskIntervals(startMinute: Int, endMinute: Int): List<Pair<Int, Int>> {
     val start = startMinute.mod(TimeMath.MINUTES_PER_DAY)
     if (endMinute == TimeMath.MINUTES_PER_DAY && start < TimeMath.MINUTES_PER_DAY) {
         return listOf(start to TimeMath.MINUTES_PER_DAY)
     }
     val end = endMinute.mod(TimeMath.MINUTES_PER_DAY)
-    if (start == end) return emptyList()
+    if (start == end) return listOf(start to start)
     return if (end > start) {
         listOf(start to end)
     } else {

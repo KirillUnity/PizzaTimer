@@ -10,11 +10,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -72,8 +82,10 @@ fun ClockPlannerProjectApp() {
     } else {
         val tasksViewModel: TasksViewModel = koinViewModel()
         val settingsViewModel: SettingsViewModel = koinViewModel()
+        val appearance by settingsViewModel.appearance.collectAsStateWithLifecycle()
         val seen by settingsViewModel.onboardingSeen.collectAsStateWithLifecycle()
         var replay by rememberSaveable { mutableStateOf(false) }
+        ClockPlannerProjectTheme(darkTheme = appearance.darkTheme) {
         when {
             seen == null -> Box(Modifier.fillMaxSize())
             replay || seen == false -> OnboardingScreen(
@@ -87,6 +99,7 @@ fun ClockPlannerProjectApp() {
                 tasksViewModel = tasksViewModel,
                 onShowOnboarding = { replay = true },
             )
+        }
         }
     }
 }
@@ -113,8 +126,18 @@ private fun ClockPlannerProjectNav(
             }
         }
     }
-    val showFab = currentDestination == AppDestinations.DAY ||
-        currentDestination == AppDestinations.TASKS
+    val showFab = currentDestination == AppDestinations.TASKS
+    val suiteType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
+        currentWindowAdaptiveInfo(),
+    )
+    // The suite bar already sits above the system navigation bar. Padding that
+    // inset again pushes the dial and lists up. Rail and drawer leave the
+    // gesture bar under the content, so that case keeps the bottom inset.
+    val contentWindowInsets = if (suiteType == NavigationSuiteType.NavigationBar) {
+        WindowInsets.safeDrawing.exclude(WindowInsets.navigationBars).union(WindowInsets.ime)
+    } else {
+        WindowInsets.safeDrawing.union(WindowInsets.ime)
+    }
     NavigationSuiteScaffold(
         navigationSuiteItems = {
             AppDestinations.entries.forEach { destination ->
@@ -134,24 +157,42 @@ private fun ClockPlannerProjectNav(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = contentWindowInsets,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             floatingActionButton = {
                 if (showFab) {
-                    FloatingActionButton(
-                        onClick = {
-                            if (currentDestination == AppDestinations.DAY && tasksViewModel != null) {
-                                tasksViewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
-                            } else {
-                                onQuickCreate()
-                            }
-                        },
-                        containerColor = TerracottaNow,
-                        contentColor = OnTerracotta,
-                        shape = CircleShape,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.fab_log_sector),
+                    val onFabClick = {
+                        if (currentDestination == AppDestinations.DAY && tasksViewModel != null) {
+                            tasksViewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
+                        } else {
+                            onQuickCreate()
+                        }
+                    }
+                    if (currentDestination == AppDestinations.TASKS) {
+                        ExtendedFloatingActionButton(
+                            onClick = onFabClick,
+                            containerColor = TerracottaNow,
+                            contentColor = OnTerracotta,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = null,
+                                )
+                            },
+                            text = { Text(stringResource(R.string.fab_add_task)) },
+                        )
+                    } else {
+                        ExtendedFloatingActionButton(
+                            onClick = onFabClick,
+                            containerColor = TerracottaNow,
+                            contentColor = OnTerracotta,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = null,
+                                )
+                            },
+                            text = { Text(stringResource(R.string.fab_add_task)) },
                         )
                     }
                 }
@@ -173,6 +214,7 @@ private fun ClockPlannerProjectNav(
                             }
                             tasksViewModel?.onIntent(TasksUiIntent.Edit(task))
                         },
+                        onOpenReports = { currentDestination = AppDestinations.REPORTS },
                     )
                     AppDestinations.TASKS -> TasksDestinationContent(
                         modifier = contentModifier,

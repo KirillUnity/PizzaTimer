@@ -39,15 +39,18 @@ class RoomTaskRepository(
 
     override suspend fun upsert(task: Task) {
         withContext(ioDispatcher) {
-            val normalized = if (task.date == null) {
-                task.copy(
-                    project = task.normalizedProject,
+            val stored = task.copy(
+                project = task.normalizedProject,
+                tags = task.normalizedTags,
+            )
+            val normalized = if (stored.date == null) {
+                stored.copy(
                     blocks = emptyList(),
                     recurrence = com.example.clockplannerproject.kit.core.RecurrenceRule.None,
                     seriesId = null,
                 )
             } else {
-                task.copy(project = task.normalizedProject)
+                stored
             }
             taskDao.upsertTask(normalized.toEntity())
             taskDao.deleteBlocks(normalized.id.value)

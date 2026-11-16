@@ -10,8 +10,9 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Full pie slices from the center. Layout angles match [prepareSectors]
- * (including CompactRemaining). Labels sit on the radius, not the ring tangent.
+ * Full pie slices from a centered hub. Layout angles match [prepareSectors]
+ * (including CompactRemaining). Wedges are unlabeled; the face keeps
+ * numerals 12, 3, 6, and 9 from the dial shell.
  *
  * @since 0.3.0
  */
@@ -41,7 +42,7 @@ object PizzaRenderer : DialRenderer {
         ring: RingLayout,
         geometry: GeometryConfig,
         paint: Paint,
-    ): List<PreparedArcLabel> = prepareRadialLabels(sectors, ring, geometry, paint)
+    ): List<PreparedArcLabel> = emptyList()
 
     override fun prepareExtras(
         sectors: List<PreparedSector>,

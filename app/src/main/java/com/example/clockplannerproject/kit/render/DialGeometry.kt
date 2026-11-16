@@ -106,7 +106,7 @@ fun prepareSectors(
     return paintOrderedTasks(tasks, selectedTaskId).flatMap { task ->
         val color = colorByTask[task.id] ?: Color.Gray
         clipTaskToHalf(task, half).map { slice ->
-            val sweep = TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute)
+            val sweep = TimeMath.visibleSliceSweepDeg(slice.startMinute, slice.endMinute)
             val visualStart = TimeMath.visualHalfAngle(
                 minuteOfDay = slice.startMinute.toFloat(),
                 anchorMinute = anchorMinute,

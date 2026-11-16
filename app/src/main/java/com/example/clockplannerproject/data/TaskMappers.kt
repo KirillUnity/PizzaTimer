@@ -18,6 +18,7 @@ internal fun TaskEntity.toDomain(blocks: List<TimeBlockEntity>): Task = Task(
     date = dateIso?.let(LocalDate::parse),
     importance = runCatching { Importance.valueOf(importance) }.getOrDefault(Importance.MEDIUM),
     project = project?.trim()?.takeIf { it.isNotEmpty() },
+    tags = com.example.clockplannerproject.kit.core.TaskTags.decode(tags),
     recurrence = decodeRecurrence(recurrenceKind, weekdaysMask),
     seriesId = seriesId,
 )
@@ -33,6 +34,7 @@ internal fun Task.toEntity(): TaskEntity = TaskEntity(
     dateIso = date?.toString(),
     importance = importance.name,
     project = normalizedProject,
+    tags = com.example.clockplannerproject.kit.core.TaskTags.encode(normalizedTags),
     recurrenceKind = encodeRecurrenceKind(recurrence),
     weekdaysMask = encodeWeekdaysMask(recurrence),
     seriesId = seriesId,

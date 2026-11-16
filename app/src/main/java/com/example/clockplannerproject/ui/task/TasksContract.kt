@@ -9,6 +9,7 @@ import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskPalette
 import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TaskTags
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.mvi.UiEffect
 import com.example.clockplannerproject.kit.core.mvi.UiIntent
@@ -28,6 +29,8 @@ data class TaskEditorState(
     val status: TaskStatus = TaskStatus.TODO,
     val importance: Importance = Importance.MEDIUM,
     val project: String = "",
+    val tags: List<String> = emptyList(),
+    val tagDraft: String = "",
     val scheduledDate: LocalDate? = null,
     val error: TaskDraftError? = null,
     val recurrence: RecurrenceRule = RecurrenceRule.None,
@@ -49,6 +52,7 @@ data class TaskEditorState(
             date = scheduledDate,
             importance = importance,
             project = normalizedProject,
+            tags = TaskTags.normalize(tags),
             recurrence = normalizedRecurrence,
             seriesId = if (normalizedRecurrence is RecurrenceRule.None) {
                 seriesId
@@ -68,6 +72,7 @@ data class TaskEditorState(
             status = task.status,
             importance = task.importance,
             project = task.normalizedProject.orEmpty(),
+            tags = task.normalizedTags,
             scheduledDate = task.date,
             recurrence = task.recurrence,
             seriesId = task.seriesId,
@@ -90,6 +95,7 @@ data class TasksUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val selectedProject: String? = null,
+    val selectedTag: String? = null,
     val projectSearch: String = "",
     val nowMinute: Int = 0,
     val pendingMove: Task? = null,
@@ -104,14 +110,19 @@ data class TasksUiState(
     val visibleTasks: List<Task>
         get() {
             val selected = selectedProject
+            val tag = selectedTag
             val query = projectSearch.trim()
             return tasks.asSequence()
                 .filter { task ->
                     selected == null || task.normalizedProject.equals(selected, ignoreCase = true)
                 }
                 .filter { task ->
+                    tag == null || task.normalizedTags.any { it.equals(tag, ignoreCase = true) }
+                }
+                .filter { task ->
                     query.isEmpty() ||
-                        task.normalizedProject?.contains(query, ignoreCase = true) == true
+                        task.normalizedProject?.contains(query, ignoreCase = true) == true ||
+                        task.normalizedTags.any { it.contains(query, ignoreCase = true) }
                 }
                 .sortedWith(
                     compareBy<Task>(
@@ -130,6 +141,16 @@ data class TasksUiState(
         get() {
             val query = projectSearch.trim()
             return tasks.mapNotNull(Task::normalizedProject)
+                .distinctBy { it.lowercase() }
+                .filter { query.isEmpty() || it.contains(query, ignoreCase = true) }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        }
+
+    /** Distinct user tags on [tasks], narrowed by [projectSearch]. */
+    val availableTags: List<String>
+        get() {
+            val query = projectSearch.trim()
+            return tasks.flatMap(Task::normalizedTags)
                 .distinctBy { it.lowercase() }
                 .filter { query.isEmpty() || it.contains(query, ignoreCase = true) }
                 .sortedWith(String.CASE_INSENSITIVE_ORDER)
@@ -161,7 +182,11 @@ sealed interface TasksUiIntent : UiIntent {
     data class ChangeStatus(val status: TaskStatus) : TasksUiIntent
     data class ChangeImportance(val importance: Importance) : TasksUiIntent
     data class ChangeProject(val value: String) : TasksUiIntent
+    data class ChangeTagDraft(val value: String) : TasksUiIntent
+    data class AddTag(val value: String) : TasksUiIntent
+    data class RemoveTag(val tag: String) : TasksUiIntent
     data class FilterByProject(val project: String?) : TasksUiIntent
+    data class FilterByTag(val tag: String?) : TasksUiIntent
     data class ChangeProjectSearch(val query: String) : TasksUiIntent
     data object ClearProjectSearch : TasksUiIntent
     data class ChangeScheduled(val scheduled: Boolean) : TasksUiIntent

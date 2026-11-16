@@ -49,7 +49,7 @@ fun hitTestTask(
                     half = half,
                     userRotationOffsetDeg = userRotationOffset,
                 )
-                val sweep = TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute)
+                val sweep = TimeMath.visibleSliceSweepDeg(slice.startMinute, slice.endMinute)
                 TimeMath.containsClockAngle(visualClockDeg, start, sweep) &&
                     renderer.acceptsHitRadius(ring, radius, sweep)
             }

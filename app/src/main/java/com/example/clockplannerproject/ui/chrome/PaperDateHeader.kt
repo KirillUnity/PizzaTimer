@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import kotlinx.datetime.LocalDate
@@ -26,7 +27,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /**
- * Date strip used on Day and Tasks paper chrome.
+ * Date strip used on Day and Tasks. Title sits between the day arrows;
+ * the calendar button stays on the trailing edge, as in the paper-craft header.
  *
  * @since 0.5.0
  */
@@ -39,6 +41,7 @@ fun PaperDateHeader(
     modifier: Modifier = Modifier,
     title: String = stringResource(R.string.day_title),
     subtitle: String? = stringResource(R.string.day_subtitle),
+    showDate: Boolean = true,
 ) {
     val label = if (date == null) {
         stringResource(R.string.tasks_date_loading)
@@ -55,35 +58,52 @@ fun PaperDateHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        IconButton(onClick = onPrevious, enabled = date != null) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.cd_previous_day),
-            )
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = title, style = MaterialTheme.typography.headlineSmall)
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onPrevious, enabled = date != null) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.cd_previous_day),
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = label, style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = onPickDate, enabled = date != null) {
-                    Icon(
-                        imageVector = Icons.Filled.DateRange,
-                        contentDescription = stringResource(R.string.cd_pick_date),
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (showDate) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
+            IconButton(onClick = onNext, enabled = date != null) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.cd_next_day),
+                )
+            }
         }
-        IconButton(onClick = onNext, enabled = date != null) {
+        IconButton(onClick = onPickDate, enabled = date != null) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.cd_next_day),
+                imageVector = Icons.Filled.CalendarToday,
+                contentDescription = stringResource(R.string.cd_pick_date),
             )
         }
     }

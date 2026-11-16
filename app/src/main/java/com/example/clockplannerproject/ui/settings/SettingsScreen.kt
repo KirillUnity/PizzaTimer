@@ -5,16 +5,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,6 +33,8 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,8 +44,10 @@ import com.example.clockplannerproject.kit.core.AppearancePalette
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.BackgroundConfig
 import com.example.clockplannerproject.kit.core.config.BackgroundPresets
-import com.example.clockplannerproject.ui.day.ViewModeRow
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
+import com.example.clockplannerproject.ui.theme.PaperCanvas
+import com.example.clockplannerproject.ui.theme.PaperSecondary
+import com.example.clockplannerproject.ui.theme.TerracottaNow
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -88,17 +98,19 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(PaperCanvas)
             .verticalScroll(rememberScrollState())
             .padding(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
             text = stringResource(R.string.settings_title),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         SectionLabel(stringResource(R.string.settings_view_mode))
-        ViewModeRow(
+        SettingsViewModes(
             selected = appearance.viewMode,
             onSelect = { onAppearance(appearance.copy(viewMode = it)) },
         )
@@ -139,14 +151,125 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
+        val darkCd = stringResource(R.string.cd_settings_dark)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_dark),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Switch(
+                checked = appearance.darkTheme,
+                onCheckedChange = { onAppearance(appearance.copy(darkTheme = it)) },
+                modifier = Modifier.semantics { contentDescription = darkCd },
+            )
+        }
         val replayCd = stringResource(R.string.cd_show_onboarding)
         TextButton(
             onClick = onShowOnboarding,
             modifier = Modifier
+                .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .semantics { contentDescription = replayCd },
         ) {
-            Text(stringResource(R.string.settings_show_onboarding))
+            Text(
+                text = stringResource(R.string.settings_show_onboarding),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+    }
+}
+
+/**
+ * Default view. The dial card's caption is the 12-hour face, never a 24-hour label.
+ *
+ * @since 1.1.0
+ */
+@Composable
+private fun SettingsViewModes(
+    selected: ViewMode,
+    onSelect: (ViewMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingsModeCard(
+                label = stringResource(R.string.view_mode_dial),
+                caption = stringResource(R.string.settings_dial_caption),
+                selected = selected == ViewMode.DIAL,
+                onClick = { onSelect(ViewMode.DIAL) },
+                modifier = Modifier.weight(1f),
+            )
+            SettingsModeCard(
+                label = stringResource(R.string.view_mode_pizza),
+                caption = null,
+                selected = selected == ViewMode.PIZZA,
+                onClick = { onSelect(ViewMode.PIZZA) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingsModeCard(
+                label = stringResource(R.string.view_mode_petals),
+                caption = null,
+                selected = selected == ViewMode.PETALS,
+                onClick = { onSelect(ViewMode.PETALS) },
+                modifier = Modifier.weight(1f),
+            )
+            SettingsModeCard(
+                label = stringResource(R.string.view_mode_list),
+                caption = null,
+                selected = selected == ViewMode.LIST,
+                onClick = { onSelect(ViewMode.LIST) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsModeCard(
+    label: String,
+    caption: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val description = stringResource(R.string.cd_view_mode, label)
+    Column(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) TerracottaNow else MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(12.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (caption != null) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = PaperSecondary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
@@ -160,6 +283,7 @@ private fun SectionLabel(text: String) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorSwatches(
     values: List<Long>,
@@ -168,15 +292,18 @@ private fun ColorSwatches(
     descriptionFor: @Composable (String) -> String,
     onSelect: (Long) -> Unit,
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         values.forEachIndexed { index, argb ->
             val label = labels[index]
             val cd = descriptionFor(label)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.widthIn(max = 96.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 androidx.compose.foundation.layout.Box(
                     modifier = Modifier
                         .size(if (selected == argb) 40.dp else 36.dp)
@@ -193,6 +320,9 @@ private fun ColorSwatches(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

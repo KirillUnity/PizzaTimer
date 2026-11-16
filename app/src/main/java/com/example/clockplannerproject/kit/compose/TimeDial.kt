@@ -92,7 +92,7 @@ fun TimeDial(
             val civil = if (slice.task.isUntimed) {
                 slice.task.title
             } else {
-                val range = TimeMath.formatBlocks(slice.task.blocks)
+                val range = TimeMath.formatRange(slice.startMinute, slice.endMinute)
                 if (compact) "${slice.task.title}  $range" else slice.task.title
             }
             Reflow.toLayoutTask(slice).copy(title = civil)
@@ -153,25 +153,30 @@ fun TimeDial(
             onResizeCancel = onResizeCancel,
             accessibilityTasks = accessibilityTasks,
         )
+        val hole = minOf(maxWidth, maxHeight) * DialHoleDiameterFraction
         DialHoleContent(
             now = currentTime,
-            selectedTask = selectedTask,
+            selectedTask = if (compact) null else selectedTask,
+            viewMode = config.viewMode,
+            holeDiameter = hole,
             onStartTimer = onStartTimer,
             onPauseTimer = onPauseTimer,
         )
-        selectedTask?.let { selected ->
-            SelectedTaskOverlays(
-                task = selected,
-                half = half,
-                nowMinute = nowMinuteInt,
-                anchorMinute = anchorMinute,
-                config = config,
-                constraints = constraints,
-                onDismiss = onDismissSelection,
-                onStartTimer = onStartTimer,
-                onPauseTimer = onPauseTimer,
-                onOpenDetails = onOpenDetails,
-            )
+        if (!compact) {
+            selectedTask?.let { selected ->
+                SelectedTaskOverlays(
+                    task = selected,
+                    half = half,
+                    nowMinute = nowMinuteInt,
+                    anchorMinute = anchorMinute,
+                    config = config,
+                    constraints = constraints,
+                    onDismiss = onDismissSelection,
+                    onStartTimer = onStartTimer,
+                    onPauseTimer = onPauseTimer,
+                    onOpenDetails = onOpenDetails,
+                )
+            }
         }
     }
 }

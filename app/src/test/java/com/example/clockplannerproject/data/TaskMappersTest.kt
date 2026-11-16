@@ -29,6 +29,7 @@ class TaskMappersTest {
             date = LocalDate(2026, 10, 6),
             importance = Importance.HIGH,
             project = "sport",
+            tags = listOf("утро", "зал"),
             recurrence = RecurrenceRule.Weekdays(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)),
             seriesId = "task-2",
         )
@@ -62,5 +63,18 @@ class TaskMappersTest {
         val restored = original.toEntity().toDomain(emptyList())
         assertEquals(null, restored.date)
         assertEquals("Research", restored.project)
+    }
+
+    @Test
+    fun mapper_normalizesCustomTags() {
+        val original = Task(
+            id = TaskId("tagged"),
+            title = "Read",
+            colorArgb = 0xFF80CBC4,
+            date = LocalDate(2026, 10, 6),
+            tags = listOf("  дома  ", "Дома", "учёба"),
+        )
+        val restored = original.toEntity().toDomain(emptyList())
+        assertEquals(listOf("дома", "учёба"), restored.tags)
     }
 }

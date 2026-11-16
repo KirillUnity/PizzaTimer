@@ -1,12 +1,17 @@
 package com.example.clockplannerproject.ui.day
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
@@ -26,9 +31,12 @@ fun EmptyDayContent(
     onAddTask: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = maxHeight)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -56,5 +64,6 @@ fun EmptyDayContent(
         Button(onClick = onAddTask) {
             Text(stringResource(R.string.day_add_task))
         }
+    }
     }
 }

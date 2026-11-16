@@ -16,6 +16,7 @@ import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskInstances
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TaskTags
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.planner.AcceptedPlan
@@ -147,8 +148,25 @@ class TasksViewModel(
             is TasksUiIntent.ChangeStatus -> updateEditor { it.copy(status = intent.status) }
             is TasksUiIntent.ChangeImportance -> updateEditor { it.copy(importance = intent.importance) }
             is TasksUiIntent.ChangeProject -> updateEditor { it.copy(project = intent.value) }
+            is TasksUiIntent.ChangeTagDraft -> updateEditor { it.copy(tagDraft = intent.value) }
+            is TasksUiIntent.AddTag -> updateEditor { editor ->
+                val draft = editor.tagDraft.trim()
+                val clearingDraft = intent.value.trim() == draft && draft.isNotEmpty()
+                editor.copy(
+                    tags = TaskTags.normalize(editor.tags + intent.value),
+                    tagDraft = if (clearingDraft) "" else editor.tagDraft,
+                )
+            }
+            is TasksUiIntent.RemoveTag -> updateEditor { editor ->
+                editor.copy(
+                    tags = editor.tags.filterNot { it.equals(intent.tag, ignoreCase = true) },
+                )
+            }
             is TasksUiIntent.FilterByProject -> _state.update {
                 it.copy(selectedProject = intent.project)
+            }
+            is TasksUiIntent.FilterByTag -> _state.update {
+                it.copy(selectedTag = intent.tag)
             }
             is TasksUiIntent.ChangeProjectSearch -> _state.update {
                 it.copy(projectSearch = intent.query)

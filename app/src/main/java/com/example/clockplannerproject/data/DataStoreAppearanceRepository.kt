@@ -49,6 +49,7 @@ class DataStoreAppearanceRepository(
             prefs[Keys.PRESET] = encoded.presetName
             prefs[Keys.COLOR] = encoded.colorArgb
             prefs[Keys.USER_URI] = encoded.userUri
+            prefs[Keys.DARK_THEME] = encoded.darkTheme
         }
     }
 
@@ -77,6 +78,7 @@ private fun Preferences.toAppearance(): Appearance = AppearanceCodec.decode(
     presetName = readString(Keys.PRESET),
     colorArgb = readLong(Keys.COLOR),
     userUri = readString(Keys.USER_URI),
+    darkTheme = readBoolean(Keys.DARK_THEME),
 )
 
 private fun Preferences.readString(key: Preferences.Key<String>): String? =
@@ -108,5 +110,6 @@ private object Keys {
     val PRESET = stringPreferencesKey("background_preset")
     val COLOR = longPreferencesKey("background_color")
     val USER_URI = stringPreferencesKey("background_user_uri")
+    val DARK_THEME = booleanPreferencesKey("dark_theme")
     val ONBOARDING_SEEN = booleanPreferencesKey("onboarding_seen")
 }

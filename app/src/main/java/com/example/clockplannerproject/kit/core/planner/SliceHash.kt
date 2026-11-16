@@ -51,6 +51,8 @@ object SliceHash {
         append('\u001f')
         append(task.normalizedProject.orEmpty())
         append('\u001f')
+        append(task.normalizedTags.joinToString(separator = ","))
+        append('\u001f')
         append(recurrenceToken(task.recurrence))
         append('\u001f')
         append(task.seriesId.orEmpty())

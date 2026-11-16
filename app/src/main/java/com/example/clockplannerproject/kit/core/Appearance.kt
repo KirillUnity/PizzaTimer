@@ -6,8 +6,11 @@ import com.example.clockplannerproject.kit.core.config.BackgroundPresets
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Saved look of the dial: mode, accent, completed color, underlay.
+ * Saved look of the dial: mode, accent, completed color, underlay, and paper theme.
  *
+ * [darkTheme] is the one quiet switch. It does not add a second theme product.
+ *
+ * @param darkTheme when true, the app uses the night paper scheme
  * @since 1.0.0
  */
 @Immutable
@@ -16,6 +19,7 @@ data class Appearance(
     val accentArgb: Long = DEFAULT_ACCENT,
     val completedArgb: Long = DEFAULT_COMPLETED,
     val background: BackgroundConfig = BackgroundConfig.None,
+    val darkTheme: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_ACCENT: Long = 0xFFE0533C
@@ -83,11 +87,13 @@ object AppearanceCodec {
         presetName: String?,
         colorArgb: Long?,
         userUri: String?,
+        darkTheme: Boolean? = null,
     ): Appearance = Appearance(
         viewMode = viewMode.toViewMode(),
         accentArgb = accentArgb ?: Appearance.DEFAULT_ACCENT,
         completedArgb = completedArgb ?: Appearance.DEFAULT_COMPLETED,
         background = background(backgroundKind, presetName, colorArgb, userUri),
+        darkTheme = darkTheme == true,
     )
 
     fun encode(appearance: Appearance): EncodedAppearance {
@@ -105,6 +111,7 @@ object AppearanceCodec {
             presetName = (background as? BackgroundConfig.Preset)?.name.orEmpty(),
             colorArgb = (background as? BackgroundConfig.Color)?.argb ?: AppearancePalette.SOLID_SAND,
             userUri = (background as? BackgroundConfig.UserImage)?.uri.orEmpty(),
+            darkTheme = appearance.darkTheme,
         )
     }
 
@@ -144,4 +151,5 @@ data class EncodedAppearance(
     val presetName: String,
     val colorArgb: Long,
     val userUri: String,
+    val darkTheme: Boolean = false,
 )

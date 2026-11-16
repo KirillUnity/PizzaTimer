@@ -34,6 +34,8 @@ enum class TaskStatus {
  * @property importance leftover weight only; ignored for civil blocks.
  * @property project optional single project. Whitespace is normalized by
  * [normalizedProject].
+ * @property tags user-created labels. Whitespace and duplicates are normalized
+ * by [normalizedTags]. Not a fixed catalog.
  * @property recurrence template rule; materialized copies use [RecurrenceRule.None].
  * @property seriesId shared id for a template and its day instances.
  * @since 0.1.0
@@ -48,12 +50,21 @@ data class Task(
     val date: LocalDate?,
     val importance: Importance = Importance.MEDIUM,
     val project: String? = null,
+    val tags: List<String> = emptyList(),
     val recurrence: RecurrenceRule = RecurrenceRule.None,
     val seriesId: String? = null,
 ) {
     /** Trimmed project name, or `null` when no project is assigned. */
     val normalizedProject: String?
         get() = project?.trim()?.takeIf { it.isNotEmpty() }
+
+    /**
+     * Tags ready to store and to show: trimmed, de-duplicated, capped.
+     *
+     * @since 1.1.0
+     */
+    val normalizedTags: List<String>
+        get() = TaskTags.normalize(tags)
 
     /** True when the task has no civil intervals. */
     val isUntimed: Boolean get() = blocks.isEmpty()

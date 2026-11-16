@@ -26,7 +26,7 @@ fun visualSliceEndDeg(
         half = half,
         userRotationOffsetDeg = userRotationOffsetDeg,
     )
-    return start + TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute)
+    return start + TimeMath.visibleSliceSweepDeg(slice.startMinute, slice.endMinute)
 }
 
 /**
@@ -54,7 +54,7 @@ fun isNearResizeHandle(
             half = half,
             userRotationOffsetDeg = userRotationOffsetDeg,
         )
-        val endDeg = start + TimeMath.sliceSweepDeg(slice.startMinute, slice.endMinute)
+        val endDeg = start + TimeMath.visibleSliceSweepDeg(slice.startMinute, slice.endMinute)
         abs(TimeMath.signedDeltaDegrees(pointerClockDeg, endDeg)) <= slopDeg
     }
 }

@@ -286,6 +286,7 @@ fun DialView(
     }
 }
 
+/** Cardinal numerals only: 12, 3, 6, and 9. */
 @Composable
 private fun DialNumerals(
     shadowColor: Color,

@@ -18,8 +18,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
@@ -28,6 +31,7 @@ import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.calloutSlice
+import com.example.clockplannerproject.kit.core.config.GeometryConfig
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
@@ -46,11 +50,9 @@ fun SectorCallout(
     task: Task,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    range: String? = null,
     onOpenDetails: () -> Unit = {},
 ) {
-    val body = task.description.ifBlank {
-        stringResource(R.string.task_description_placeholder)
-    }
     val cd = stringResource(R.string.cd_sector_callout, task.title)
     Surface(
         onClick = onDismiss,
@@ -62,11 +64,24 @@ fun SectorCallout(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 180.dp)
+                .widthIn(max = CALLOUT_WIDTH)
                 .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 4.dp),
         ) {
-            Text(text = task.title, style = MaterialTheme.typography.titleSmall)
-            Text(text = body, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!range.isNullOrBlank()) {
+                Text(
+                    text = range,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             TextButton(onClick = onOpenDetails) {
                 Text(stringResource(R.string.task_details))
             }
@@ -93,8 +108,9 @@ fun BoxScope.SelectedTaskOverlays(
     onOpenDetails: () -> Unit = {},
 ) {
     if (config.viewMode == ViewMode.LIST) return
+    val running = TaskTimer.hasOpenBlock(task)
     val slice = calloutSlice(task, half, nowMinute)
-    if (slice != null) {
+    if (slice != null && !(running && config.viewMode == ViewMode.DIAL)) {
         val visualMid = TimeMath.visualHalfAngle(
             minuteOfDay = (slice.startMinute + slice.endMinute) / 2f,
             anchorMinute = anchorMinute,
@@ -123,9 +139,15 @@ fun BoxScope.SelectedTaskOverlays(
             calloutHeight = calloutHeight,
             margin = margin,
             preferRight = cos(canvasRad) >= 0,
+            avoid = if (config.viewMode == ViewMode.DIAL) {
+                dialCalloutKeepOut(constraints, density)
+            } else {
+                emptyList()
+            },
         )
         SectorCallout(
             task = task,
+            range = TimeMath.formatRange(slice.startMinute, slice.endMinute),
             onDismiss = onDismiss,
             onOpenDetails = onOpenDetails,
             modifier = Modifier
@@ -133,13 +155,15 @@ fun BoxScope.SelectedTaskOverlays(
                 .offset { offset },
         )
     }
-    TimerHoleOverlay(
-        running = TaskTimer.hasOpenBlock(task),
-        canStart = TaskTimer.canStart(task),
-        onStart = onStartTimer,
-        onPause = onPauseTimer,
-        modifier = Modifier.align(Alignment.Center),
-    )
+    if (config.viewMode != ViewMode.DIAL) {
+        TimerHoleOverlay(
+            running = running,
+            canStart = TaskTimer.canStart(task),
+            onStart = onStartTimer,
+            onPause = onPauseTimer,
+            modifier = Modifier.align(Alignment.Center),
+        )
+    }
 }
 
 internal fun boundedCalloutOffset(
@@ -151,6 +175,7 @@ internal fun boundedCalloutOffset(
     calloutHeight: Int,
     margin: Int,
     preferRight: Boolean,
+    avoid: List<IntRect> = emptyList(),
 ): IntOffset {
     val preferredX = if (preferRight) {
         anchorX.toInt() + margin
@@ -159,15 +184,91 @@ internal fun boundedCalloutOffset(
     }
     val maxX = (containerWidth - calloutWidth - margin).coerceAtLeast(margin)
     val maxY = (containerHeight - calloutHeight - margin).coerceAtLeast(margin)
-    return IntOffset(
+    val preferred = IntOffset(
         x = preferredX.coerceIn(margin, maxX),
         y = (anchorY.toInt() - calloutHeight / 2).coerceIn(margin, maxY),
     )
+    if (avoid.isEmpty() || !calloutHits(preferred, calloutWidth, calloutHeight, avoid)) {
+        return preferred
+    }
+    val step = (calloutHeight / 4).coerceAtLeast(8)
+    var best = preferred
+    var bestDistance = Long.MAX_VALUE
+    var y = margin
+    while (y <= maxY) {
+        var x = margin
+        while (x <= maxX) {
+            val candidate = IntOffset(x, y)
+            if (!calloutHits(candidate, calloutWidth, calloutHeight, avoid)) {
+                val dx = (x - preferred.x).toLong()
+                val dy = (y - preferred.y).toLong()
+                val distance = dx * dx + dy * dy
+                if (distance < bestDistance) {
+                    bestDistance = distance
+                    best = candidate
+                }
+            }
+            x += step
+        }
+        y += step
+    }
+    return best
 }
 
-private val CALLOUT_WIDTH = 168.dp
-private val CALLOUT_ESTIMATED_HEIGHT = 112.dp
+private fun calloutHits(
+    origin: IntOffset,
+    width: Int,
+    height: Int,
+    avoid: List<IntRect>,
+): Boolean {
+    val placed = IntRect(origin.x, origin.y, origin.x + width, origin.y + height)
+    return avoid.any { it.overlaps(placed) }
+}
+
+/**
+ * Keeps the description cloud off numerals 12 and 3 and out of the hub.
+ */
+private fun dialCalloutKeepOut(
+    constraints: Constraints,
+    density: androidx.compose.ui.unit.Density,
+): List<IntRect> {
+    val numeral = with(density) { NUMERAL_KEEP_OUT.roundToPx() }
+    val gap = with(density) { CALLOUT_MARGIN.roundToPx() }
+    val side = minOf(constraints.maxWidth, constraints.maxHeight)
+    val holeRadius = (side * DialHoleDiameterFraction / 2f).toInt() + gap
+    val cx = constraints.maxWidth / 2
+    val cy = constraints.maxHeight / 2
+    return listOf(
+        IntRect(
+            left = cx - numeral,
+            top = 0,
+            right = cx + numeral,
+            bottom = numeral,
+        ),
+        IntRect(
+            left = constraints.maxWidth - numeral,
+            top = cy - numeral / 2,
+            right = constraints.maxWidth,
+            bottom = cy + numeral / 2,
+        ),
+        IntRect(
+            left = cx - holeRadius,
+            top = cy - holeRadius,
+            right = cx + holeRadius,
+            bottom = cy + holeRadius,
+        ),
+    )
+}
+
+/** Inner hole diameter as a fraction of the square dial side. */
+internal const val DialHoleDiameterFraction: Float =
+    (1f - 2f * GeometryConfig.OUTER_INSET_FRACTION) *
+        (1f - 2f * GeometryConfig.RING_THICKNESS_FRACTION)
+
+private val CALLOUT_WIDTH = 180.dp
+private val CALLOUT_ESTIMATED_HEIGHT = 96.dp
 private val CALLOUT_MARGIN = 8.dp
+private val NUMERAL_KEEP_OUT = 40.dp
 
 /**
  * Hole content: LIVE CHRONO when idle, Start/Pause when a sector is selected.
@@ -179,11 +280,38 @@ private val CALLOUT_MARGIN = 8.dp
 fun BoxScope.DialHoleContent(
     now: kotlinx.datetime.LocalTime?,
     selectedTask: Task?,
+    viewMode: ViewMode,
+    holeDiameter: Dp,
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
 ) {
-    if (selectedTask == null) {
-        LiveChronoHole(now = now, modifier = Modifier.align(Alignment.Center))
+    val task = selectedTask
+    when {
+        task == null -> LiveChronoHole(
+            now = now,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .widthIn(max = holeDiameter),
+        )
+        TaskTimer.hasOpenBlock(task) && viewMode == ViewMode.DIAL -> {
+            val open = task.blocks.firstOrNull { it.isOpen }
+            val nowMinute = now?.let { TimeMath.minuteOfDay(it).toInt() } ?: open?.startMinute ?: 0
+            val elapsed = open?.let { formatSessionElapsed(it.startMinute, nowMinute) } ?: "00:00"
+            RunningSessionHole(
+                taskTitle = task.title,
+                elapsed = elapsed,
+                holeDiameter = holeDiameter,
+                onPause = onPauseTimer,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        viewMode == ViewMode.DIAL -> TimerHoleOverlay(
+            running = false,
+            canStart = TaskTimer.canStart(task),
+            onStart = onStartTimer,
+            onPause = onPauseTimer,
+            modifier = Modifier.align(Alignment.Center),
+        )
     }
 }
 
@@ -193,6 +321,7 @@ private fun SectorCalloutPreview() {
     ClockPlannerProjectTheme {
         SectorCallout(
             task = SampleTasks.typicalDay(LocalDate(2026, 10, 6))[1],
+            range = "14:30 – 16:30",
             onDismiss = {},
             modifier = Modifier.padding(16.dp),
         )

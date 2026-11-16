@@ -16,6 +16,7 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.time.TimeMath
+import com.example.clockplannerproject.ui.day.flow.PauseMood
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
@@ -151,15 +152,37 @@ class DayViewModel(
             DayUiIntent.OpenDatePicker -> _state.update { it.copy(showDatePicker = true) }
             DayUiIntent.DismissDatePicker -> _state.update { it.copy(showDatePicker = false) }
             is DayUiIntent.SelectDate -> {
+                clearDayFlow()
                 selectedDate.value = intent.date
                 _state.update { it.copy(showDatePicker = false) }
             }
             is DayUiIntent.SetDialHalf -> _state.update { it.copy(dialHalf = intent.half) }
+            is DayUiIntent.ChangePauseDraft -> _state.update { it.copy(pauseDraft = intent.text) }
+            is DayUiIntent.SelectPauseMood -> _state.update { it.copy(pauseMood = intent.mood) }
+            DayUiIntent.CommitPause -> commitPause()
+            DayUiIntent.SkipPause -> _state.update { it.copy(pauseSlipOpen = false) }
+            DayUiIntent.ShowDayClose -> _state.update {
+                it.copy(showDayClose = true, pauseSlipOpen = false)
+            }
+            DayUiIntent.DismissDayClose -> _state.update { it.copy(showDayClose = false) }
         }
     }
 
     private fun shiftDate(days: Int) {
+        clearDayFlow()
         selectedDate.update { it.plus(days, DateTimeUnit.DAY) }
+    }
+
+    private fun clearDayFlow() {
+        _state.update {
+            it.copy(
+                pauseSlipOpen = false,
+                pauseDraft = "",
+                pauseMood = PauseMood.Calm,
+                resumeCheckpoint = null,
+                showDayClose = false,
+            )
+        }
     }
 
     private fun persistAppearance(next: Appearance) {
@@ -234,6 +257,11 @@ class DayViewModel(
                                     showMovePicker = current.showMovePicker,
                                     showDatePicker = current.showDatePicker,
                                     dialHalf = half,
+                                    pauseSlipOpen = current.pauseSlipOpen,
+                                    pauseDraft = current.pauseDraft,
+                                    pauseMood = current.pauseMood,
+                                    resumeCheckpoint = current.resumeCheckpoint,
+                                    showDayClose = current.showDayClose,
                                 )
                             }
                         }
@@ -375,13 +403,33 @@ class DayViewModel(
         val task = _state.value.selectedTask ?: return
         val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
         if (!TaskTimer.canStart(task)) return
+        _state.update { it.copy(resumeCheckpoint = null, showDayClose = false, pauseSlipOpen = false) }
         persistTimer(TaskTimer.start(task, now))
     }
 
     private fun pauseTimer() {
         val task = _state.value.selectedTask ?: return
         val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        _state.update {
+            it.copy(
+                pauseSlipOpen = true,
+                showDayClose = false,
+                pauseDraft = "",
+                pauseMood = PauseMood.Calm,
+            )
+        }
         persistTimer(TaskTimer.pause(task, now))
+    }
+
+    private fun commitPause() {
+        val text = _state.value.pauseDraft.trim()
+        _state.update {
+            it.copy(
+                pauseSlipOpen = false,
+                pauseDraft = "",
+                resumeCheckpoint = text.ifEmpty { it.resumeCheckpoint },
+            )
+        }
     }
 
     private fun persistTimer(updated: Task) {

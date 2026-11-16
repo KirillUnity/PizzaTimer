@@ -21,6 +21,9 @@ object TimeMath {
     const val MINUTES_PER_HALF: Int = 720
     const val DEGREES_CIRCLE: Float = 360f
 
+    /** Smallest painted wedge for a block whose start and end are the same minute. */
+    const val MIN_POINT_SECTOR_SWEEP_DEG: Float = 8f
+
     /** Canvas degrees are offset so that clock `0°` lands at 12 o'clock. */
     const val CANVAS_ZERO_OFFSET_DEG: Float = -90f
 
@@ -158,6 +161,18 @@ object TimeMath {
     fun sliceSweepDeg(startMinute: Int, endMinute: Int): Float {
         val duration = (endMinute - startMinute).coerceAtLeast(0)
         return duration / MINUTES_PER_HALF.toFloat() * DEGREES_CIRCLE
+    }
+
+    /**
+     * Sweep used to paint and hit-test a slice. A zero-length interval
+     * (`start == end`) still occupies [MIN_POINT_SECTOR_SWEEP_DEG] so a second
+     * block on the same task stays visible.
+     *
+     * @since 1.1.0
+     */
+    fun visibleSliceSweepDeg(startMinute: Int, endMinute: Int): Float {
+        val sweep = sliceSweepDeg(startMinute, endMinute)
+        return if (startMinute == endMinute) MIN_POINT_SECTOR_SWEEP_DEG else sweep
     }
 
     /**
