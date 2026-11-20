@@ -291,7 +291,7 @@ class TasksViewModel(
                 _state.update { it.copy(reportDraft = "", editingReportId = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_note_save),
                 )
@@ -320,7 +320,7 @@ class TasksViewModel(
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -363,7 +363,7 @@ class TasksViewModel(
                 _state.update { it.copy(editor = null, timePicker = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_task_save),
                 )
@@ -385,7 +385,7 @@ class TasksViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_task_delete),
                 )
@@ -434,7 +434,7 @@ class TasksViewModel(
                 taskRepository.upsert(copy)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_task_duplicate),
                 )
@@ -450,7 +450,7 @@ class TasksViewModel(
                 _state.update { it.copy(pendingMove = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_task_move),
                 )
@@ -506,7 +506,7 @@ class TasksViewModel(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
                     TasksUiEffect.ShowMessageRes(R.string.error_task_diagram),
                 )
@@ -759,7 +759,7 @@ class TasksViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 if (generation == planGeneration) {
                     _state.update { current ->
                         val open = current.planSheet as? PlanSheetUi.Draft ?: return@update current

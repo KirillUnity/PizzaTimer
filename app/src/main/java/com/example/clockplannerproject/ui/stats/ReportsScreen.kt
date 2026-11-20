@@ -35,11 +35,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -73,18 +75,34 @@ fun ReportsDestinationContent(modifier: Modifier = Modifier) {
         val viewModel: ReportsViewModel = koinViewModel()
         val state by viewModel.state.collectAsStateWithLifecycle()
         val snackbarHostState = remember { SnackbarHostState() }
-        val context = LocalContext.current
+        var snackbarResId by remember { mutableStateOf<Int?>(null) }
+        var snackbarLiteral by remember { mutableStateOf<String?>(null) }
+        var snackbarNonce by remember { mutableIntStateOf(0) }
         val launchers = rememberReportImportLaunchers { id, uri ->
             viewModel.onIntent(ReportsUiIntent.ImportAttachment(id, uri))
         }
         LaunchedEffect(viewModel) {
             viewModel.effect.collect { effect ->
-                val text = when (effect) {
-                    is ReportsUiEffect.ShowMessage -> effect.message
-                    is ReportsUiEffect.ShowMessageRes -> context.getString(effect.resId)
+                when (effect) {
+                    is ReportsUiEffect.ShowMessage -> {
+                        snackbarLiteral = effect.message
+                        snackbarResId = null
+                        snackbarNonce += 1
+                    }
+                    is ReportsUiEffect.ShowMessageRes -> {
+                        snackbarResId = effect.resId
+                        snackbarLiteral = null
+                        snackbarNonce += 1
+                    }
                 }
-                snackbarHostState.showSnackbar(text)
             }
+        }
+        val snackbarFromRes = snackbarResId?.let { stringResource(it) }
+        val snackbarText = snackbarLiteral ?: snackbarFromRes
+        LaunchedEffect(snackbarNonce) {
+            val text = snackbarText ?: return@LaunchedEffect
+            if (snackbarNonce == 0) return@LaunchedEffect
+            snackbarHostState.showSnackbar(text)
         }
         androidx.compose.foundation.layout.Box(modifier) {
             ReportsScreen(
