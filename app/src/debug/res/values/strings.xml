@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="planner_debug_triggers">A goal that starts with «офлайн» is a refusal. A goal that contains «десятки» is deliberately heavy steps.</string>
+</resources>

@@ -1,6 +1,12 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.data.InMemoryFlowMemoryStore
+import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
 import com.example.clockplannerproject.data.SampleDaySeeder
+import com.example.clockplannerproject.data.SampleSeedFlagStore
+import com.example.clockplannerproject.kit.core.DialHalf
+import com.example.clockplannerproject.kit.core.FlowMemoryStore
+import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskRepository
@@ -8,10 +14,13 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.ViewMode
-import com.example.clockplannerproject.ui.day.flow.PauseMood
+import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
+import com.example.clockplannerproject.kit.core.practice.PracticeSkill
+import com.example.clockplannerproject.kit.core.PauseMood
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -244,6 +253,217 @@ class DayViewModelTest {
     }
 
     @Test
+    fun midnight_followsOpenToday() {
+        val today = date
+        val yesterday = LocalDate(2026, 10, 5)
+        val next = LocalDate(2026, 10, 7)
+        val dayAfter = LocalDate(2026, 10, 8)
+        val openBlock = TimeBlock(23 * 60, null)
+        val open = work.copy(
+            blocks = listOf(openBlock),
+            status = TaskStatus.IN_PROGRESS,
+        )
+        val daily = Task(
+            id = TaskId("daily"),
+            title = "Daily",
+            colorArgb = 0xFF607D8B,
+            date = today,
+            recurrence = RecurrenceRule.Daily,
+        )
+        val openRepo = FakeTaskRepository(listOf(open, daily))
+        val openClock = FakeTimeProvider(today, LocalTime(23, 59))
+        val openDay = DayViewModel(
+            taskRepository = openRepo,
+            timeProvider = openClock,
+            sampleDaySeeder = SampleDaySeeder(openRepo, openClock, MemorySampleSeedFlag()),
+        )
+        assertEquals(today, openDay.state.value.date)
+        assertEquals(DialHalf.PM, openDay.state.value.dialHalf)
+
+        openClock.set(next, LocalTime(0, 0))
+
+        assertEquals(next, openDay.state.value.date)
+        assertEquals(DialHalf.AM, openDay.state.value.dialHalf)
+        val stored = openRepo.snapshot().single { it.id == open.id }
+        assertEquals(today, stored.date)
+        assertEquals(listOf(openBlock), stored.blocks)
+        val materialized = openDay.state.value.tasks.single()
+        assertEquals(next, materialized.date)
+        assertEquals(daily.id.value, materialized.seriesId)
+        assertTrue(openRepo.snapshot().none { it.date == dayAfter })
+
+        val emptyRepo = FakeTaskRepository()
+        val emptyClock = FakeTimeProvider(today, LocalTime(23, 59))
+        val seeded = DayViewModel(
+            taskRepository = emptyRepo,
+            timeProvider = emptyClock,
+            sampleDaySeeder = SampleDaySeeder(emptyRepo, emptyClock, MemorySampleSeedFlag()),
+        )
+        val datesBeforeAdvance = emptyRepo.snapshot().map { it.date }
+        emptyClock.set(next, LocalTime(0, 0))
+        assertEquals(next, seeded.state.value.date)
+        assertEquals(datesBeforeAdvance, emptyRepo.snapshot().map { it.date })
+        assertTrue(seeded.state.value.tasks.isEmpty())
+
+        val heldRepo = FakeTaskRepository(listOf(work))
+        val heldClock = FakeTimeProvider(today, LocalTime(23, 59))
+        val held = DayViewModel(
+            taskRepository = heldRepo,
+            timeProvider = heldClock,
+            sampleDaySeeder = SampleDaySeeder(heldRepo, heldClock, MemorySampleSeedFlag()),
+        )
+        held.onIntent(DayUiIntent.PreviousDay)
+        assertEquals(yesterday, held.state.value.date)
+        val halfWhileAway = held.state.value.dialHalf
+        heldClock.set(next, LocalTime(0, 0))
+        assertEquals(yesterday, held.state.value.date)
+        assertEquals(halfWhileAway, held.state.value.dialHalf)
+
+        held.onIntent(DayUiIntent.SelectDate(next))
+        assertEquals(next, held.state.value.date)
+        heldClock.set(dayAfter, LocalTime(0, 1))
+        assertEquals(dayAfter, held.state.value.date)
+        assertEquals(DialHalf.AM, held.state.value.dialHalf)
+    }
+
+    @Test
+    fun commit_survivesNewViewModel_startClearsIt_skipLeavesOther() {
+        val memory = InMemoryFlowMemoryStore()
+        val other = work.copy(
+            id = TaskId("other"),
+            title = "Other",
+            blocks = listOf(TimeBlock(14 * 60, 15 * 60)),
+        )
+        val repository = FakeTaskRepository(listOf(work, other))
+        val viewModel = dayViewModel(
+            initial = emptyList(),
+            clock = LocalTime(12, 0),
+            flowMemory = memory,
+            repository = repository,
+        )
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val later = dayViewModel(
+            initial = emptyList(),
+            clock = LocalTime(13, 0),
+            flowMemory = memory,
+            repository = repository,
+        )
+        val started = later.state.value.tasks.first { it.id == work.id }
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        later.onIntent(DayUiIntent.ChangePauseDraft("  цифры за четверг  "))
+        later.onIntent(DayUiIntent.SelectPauseMood(PauseMood.Deep))
+        later.onIntent(DayUiIntent.CommitPause)
+        assertEquals("цифры за четверг", later.state.value.resumeCheckpoint)
+        assertEquals(PauseMood.Deep, later.state.value.resumeMood)
+        val closed = later.state.value.tasks.first { it.id == work.id }.blocks
+
+        val reloaded = dayViewModel(
+            initial = emptyList(),
+            clock = LocalTime(13, 30),
+            flowMemory = memory,
+            repository = repository,
+        )
+        reloaded.onIntent(DayUiIntent.SelectTask(reloaded.state.value.tasks.first { it.id == work.id }))
+        assertEquals("цифры за четверг", reloaded.state.value.resumeCheckpoint)
+        assertEquals(PauseMood.Deep, reloaded.state.value.resumeMood)
+
+        reloaded.onIntent(DayUiIntent.ChangePauseDraft("   "))
+        reloaded.onIntent(DayUiIntent.SelectPauseMood(PauseMood.Stuck))
+        reloaded.onIntent(DayUiIntent.CommitPause)
+        assertEquals("цифры за четверг", reloaded.state.value.resumeCheckpoint)
+        assertEquals(PauseMood.Deep, reloaded.state.value.resumeMood)
+
+        reloaded.onIntent(DayUiIntent.SelectTask(reloaded.state.value.tasks.first { it.id == other.id }))
+        reloaded.onIntent(DayUiIntent.PauseTimer)
+        reloaded.onIntent(DayUiIntent.ChangePauseDraft("чужое"))
+        reloaded.onIntent(DayUiIntent.SkipPause)
+        reloaded.onIntent(DayUiIntent.SelectTask(reloaded.state.value.tasks.first { it.id == work.id }))
+        assertEquals("цифры за четверг", reloaded.state.value.resumeCheckpoint)
+        assertEquals(PauseMood.Deep, reloaded.state.value.resumeMood)
+
+        val beforeStart = reloaded.state.value.tasks.first { it.id == work.id }.blocks
+        assertEquals(closed, beforeStart)
+        reloaded.onIntent(DayUiIntent.StartTimer)
+        assertNull(reloaded.state.value.resumeCheckpoint)
+        assertNull(reloaded.state.value.resumeMood)
+        val after = reloaded.state.value.tasks.first { it.id == work.id }
+        assertEquals(beforeStart.first(), after.blocks.first())
+        assertEquals(beforeStart.size + 1, after.blocks.size)
+        assertNull(after.blocks.last().endMinute)
+    }
+
+    @Test
+    fun dayClose_isVisibleOnThatDate_andHiddenOnTheNext() {
+        val memory = InMemoryFlowMemoryStore()
+        val repository = FakeTaskRepository(listOf(work))
+        val viewModel = dayViewModel(
+            initial = emptyList(),
+            flowMemory = memory,
+            repository = repository,
+        )
+        viewModel.onIntent(DayUiIntent.ShowDayClose)
+        assertTrue(viewModel.state.value.showDayClose)
+
+        val again = dayViewModel(
+            initial = emptyList(),
+            flowMemory = memory,
+            repository = repository,
+        )
+        assertTrue(again.state.value.showDayClose)
+        again.onIntent(DayUiIntent.NextDay)
+        assertEquals(LocalDate(2026, 10, 7), again.state.value.date)
+        assertFalse(again.state.value.showDayClose)
+        again.onIntent(DayUiIntent.PreviousDay)
+        assertTrue(again.state.value.showDayClose)
+        again.onIntent(DayUiIntent.DismissDayClose)
+
+        val hidden = dayViewModel(
+            initial = emptyList(),
+            flowMemory = memory,
+            repository = repository,
+        )
+        assertFalse(hidden.state.value.showDayClose)
+        hidden.onIntent(DayUiIntent.ShowDayClose)
+        assertTrue(hidden.state.value.showDayClose)
+        hidden.onIntent(DayUiIntent.SelectTask(hidden.state.value.tasks.single()))
+        hidden.onIntent(DayUiIntent.StartTimer)
+        assertTrue(hidden.state.value.showDayClose)
+        assertEquals(2, hidden.state.value.tasks.single().blocks.size)
+    }
+
+    @Test
+    fun changingDay_hidesSlip_andKeepsCheckpoint() {
+        val memory = InMemoryFlowMemoryStore()
+        val repository = FakeTaskRepository(listOf(work))
+        val viewModel = dayViewModel(
+            initial = emptyList(),
+            clock = LocalTime(13, 0),
+            flowMemory = memory,
+            repository = repository,
+        )
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.PauseTimer)
+        viewModel.onIntent(DayUiIntent.ChangePauseDraft("цифры за четверг"))
+        viewModel.onIntent(DayUiIntent.SelectPauseMood(PauseMood.Calm))
+        viewModel.onIntent(DayUiIntent.CommitPause)
+        viewModel.onIntent(DayUiIntent.ShowDayClose)
+        assertTrue(viewModel.state.value.showDayClose)
+
+        viewModel.onIntent(DayUiIntent.NextDay)
+        assertFalse(viewModel.state.value.pauseSlipOpen)
+        assertFalse(viewModel.state.value.showDayClose)
+        assertNull(viewModel.state.value.resumeCheckpoint)
+
+        viewModel.onIntent(DayUiIntent.PreviousDay)
+        viewModel.onIntent(DayUiIntent.SelectTask(viewModel.state.value.tasks.first { it.id == work.id }))
+        assertEquals("цифры за четверг", viewModel.state.value.resumeCheckpoint)
+        assertEquals(PauseMood.Calm, viewModel.state.value.resumeMood)
+        assertTrue(viewModel.state.value.showDayClose)
+    }
+
+    @Test
     fun previousDay_shiftsSelectedDate() {
         val viewModel = dayViewModel(listOf(work))
         assertEquals(date, viewModel.state.value.date)
@@ -262,16 +482,49 @@ class DayViewModelTest {
         assertNull(viewModel.state.value.pendingDelete)
     }
 
+    @Test
+    fun practice_dialSelectStartCommitAndDayClose_setFlags_pizzaAndBlankDoNot() = runTest {
+        val practice = InMemoryPracticeProgressStore()
+        val viewModel = dayViewModel(listOf(work), practice = practice)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        viewModel.onIntent(DayUiIntent.ChangePauseDraft("   "))
+        viewModel.onIntent(DayUiIntent.CommitPause)
+        var tried = practice.observe().first()
+        assertTrue(PracticeSkill.DIAL in tried)
+        assertTrue(PracticeSkill.START in tried)
+        assertFalse(PracticeSkill.CHECKPOINT in tried)
+
+        viewModel.onIntent(DayUiIntent.ChangePauseDraft("next line"))
+        viewModel.onIntent(DayUiIntent.CommitPause)
+        viewModel.onIntent(DayUiIntent.ShowDayClose)
+        tried = practice.observe().first()
+        assertTrue(PracticeSkill.CHECKPOINT in tried)
+        assertTrue(PracticeSkill.DAY_CLOSE in tried)
+        assertFalse(PracticeSkill.LEFTOVER in tried)
+
+        val pizza = InMemoryPracticeProgressStore()
+        val pizzaDay = dayViewModel(listOf(work), practice = pizza)
+        pizzaDay.onIntent(DayUiIntent.SetViewMode(ViewMode.PIZZA))
+        pizzaDay.onIntent(DayUiIntent.SelectTask(work))
+        assertTrue(pizza.observe().first().isEmpty())
+    }
+
     private fun dayViewModel(
         initial: List<Task>,
         clock: LocalTime = LocalTime(9, 30),
+        flowMemory: FlowMemoryStore = InMemoryFlowMemoryStore(),
+        repository: FakeTaskRepository? = null,
+        practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
     ): DayViewModel {
         val time = FakeTimeProvider(date, clock)
-        val repository = FakeTaskRepository(initial)
+        val tasks = repository ?: FakeTaskRepository(initial)
         return DayViewModel(
-            taskRepository = repository,
+            taskRepository = tasks,
             timeProvider = time,
-            sampleDaySeeder = SampleDaySeeder(repository, time),
+            sampleDaySeeder = SampleDaySeeder(tasks, time, MemorySampleSeedFlag()),
+            flowMemory = flowMemory,
+            practice = practice,
         )
     }
 }
@@ -306,14 +559,33 @@ private class FakeTaskRepository(
         items.value.any { task ->
             task.date == date && (task.seriesId == seriesId || task.id.value == seriesId)
         }
+
+    fun snapshot(): List<Task> = items.value
 }
 
 private class FakeTimeProvider(
-    private val date: LocalDate,
-    private val time: LocalTime = LocalTime(9, 30),
+    initialDate: LocalDate,
+    time: LocalTime = LocalTime(9, 30),
 ) : TimeProvider {
+    private var date: LocalDate = initialDate
     private val ticks = MutableStateFlow(time)
+
+    fun set(date: LocalDate, time: LocalTime) {
+        this.date = date
+        ticks.value = time
+    }
+
     override fun now(): LocalTime = ticks.value
     override fun today(): LocalDate = date
     override fun observeTime(): Flow<LocalTime> = ticks
+}
+
+private class MemorySampleSeedFlag : SampleSeedFlagStore {
+    private var handled = false
+
+    override suspend fun isHandled(): Boolean = handled
+
+    override suspend fun markHandled() {
+        handled = true
+    }
 }

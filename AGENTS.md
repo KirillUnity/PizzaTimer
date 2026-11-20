@@ -86,3 +86,13 @@ Rules:
 2. Code with English KDoc on public APIs
 3. How to verify
 4. What you intentionally did not do
+
+## Spec-driven development
+
+Product intent lives in [spec/mission.md](spec/mission.md). Shipped behavior lives in `openspec/specs/`. A feature that matches no mission-fit check in that file stays out of scope.
+
+Every code change starts with `/openspec-propose` (also “opsx propose”) and ends with `/openspec-archive-change` (also “opsx archive”). Implementation is `/openspec-apply-change`. OpenSpec 2.1 keeps those workflows as skills in `.agents/skills/`. If no active change exists, write the proposal before editing Kotlin. Do not archive until `:app:testDebugUnitTest` passes. When code and a spec disagree, open a new change; do not silently edit `openspec/specs/`.
+
+Preservation baselines: task list, flow session, day dial. The learning library (mission §7) is not in this build.
+
+Before reading a file into an LLM, confirm it is not matched by [.cursorignore](.cursorignore). That file blocks Agent, Tab, and `@` mentions. The terminal and MCP servers still read ignored files, so production keys must not sit in the working tree.

@@ -9,9 +9,18 @@ import com.example.clockplannerproject.data.SystemTimeProvider
 import com.example.clockplannerproject.data.TimeDialDatabase
 import com.example.clockplannerproject.data.AndroidPlannerPhrases
 import com.example.clockplannerproject.data.DataStoreAppearanceRepository
+import com.example.clockplannerproject.data.DataStoreFlowMemoryStore
 import com.example.clockplannerproject.data.DataStorePlannerPlanStore
+import com.example.clockplannerproject.data.DataStorePracticeProgressStore
+import com.example.clockplannerproject.data.DataStoreSampleSeedFlagStore
+import com.example.clockplannerproject.data.DialPhotoSelection
+import com.example.clockplannerproject.data.FilesDirDialPhotoStore
 import com.example.clockplannerproject.data.MockPlannerSource
+import com.example.clockplannerproject.data.SampleSeedFlagStore
+import com.example.clockplannerproject.kit.core.DialPhotoFiles
 import com.example.clockplannerproject.kit.core.AppearanceRepository
+import com.example.clockplannerproject.kit.core.FlowMemoryStore
+import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.ReportRepository
@@ -20,6 +29,7 @@ import com.example.clockplannerproject.kit.core.planner.PlannerPlanStore
 import com.example.clockplannerproject.kit.core.planner.PlannerSource
 import com.example.clockplannerproject.ui.day.DayViewModel
 import com.example.clockplannerproject.ui.settings.SettingsViewModel
+import com.example.clockplannerproject.ui.settings.practice.PracticeViewModel
 import com.example.clockplannerproject.ui.stats.ReportsViewModel
 import com.example.clockplannerproject.ui.task.TasksViewModel
 import org.koin.android.ext.koin.androidContext
@@ -38,13 +48,19 @@ val appModule = module {
         AndroidReportImporter(androidContext(), get())
     }
     single<AppearanceRepository> { DataStoreAppearanceRepository.create(androidContext()) }
+    single<DialPhotoFiles> { FilesDirDialPhotoStore(androidContext().filesDir) }
+    single { DialPhotoSelection(get(), get()) }
+    single<FlowMemoryStore> { DataStoreFlowMemoryStore.create(androidContext()) }
+    single<PracticeProgressStore> { DataStorePracticeProgressStore.create(androidContext()) }
     single<PlannerPlanStore> { DataStorePlannerPlanStore.create(androidContext()) }
     single<PlannerPhrases> { AndroidPlannerPhrases(androidContext()) }
     single<PlannerSource> { MockPlannerSource(get(), get(), get()) }
     single<TimeProvider> { SystemTimeProvider() }
-    single { SampleDaySeeder(get(), get()) }
+    single<SampleSeedFlagStore> { DataStoreSampleSeedFlagStore.create(androidContext()) }
+    single { SampleDaySeeder(get(), get(), get()) }
     viewModelOf(::DayViewModel)
     viewModelOf(::TasksViewModel)
     viewModelOf(::ReportsViewModel)
     viewModelOf(::SettingsViewModel)
+    viewModelOf(::PracticeViewModel)
 }

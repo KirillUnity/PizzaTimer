@@ -119,7 +119,6 @@ private fun ClockPlannerProjectNav(
         LaunchedEffect(tasksViewModel) {
             tasksViewModel.effect.collect { effect ->
                 when (effect) {
-                    is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
                     is TasksUiEffect.ShowMessageRes ->
                         snackbarHostState.showSnackbar(context.getString(effect.resId))
                 }
@@ -223,6 +222,7 @@ private fun ClockPlannerProjectNav(
                     AppDestinations.REPORTS -> ReportsDestinationContent(modifier = contentModifier)
                     AppDestinations.SETTINGS -> SettingsDestinationContent(
                         onShowOnboarding = onShowOnboarding,
+                        onOpenDay = { currentDestination = AppDestinations.DAY },
                         modifier = contentModifier,
                     )
                 }

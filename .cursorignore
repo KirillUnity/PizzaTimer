@@ -1,0 +1,20 @@
+﻿# Secrets stay out of Cursor Agent, Tab, and @ mentions.
+# The terminal and MCP servers do not honor this file.
+
+.env
+.env.*
+**/secrets.json
+**/credentials.json
+**/*.pem
+**/*.key
+**/id_rsa
+config/production.json
+config/secrets.yaml
+.npmrc
+.pypirc
+
+# Android signing and local SDK paths for this repo
+local.properties
+**/*.jks
+**/*.keystore
+google-services.json

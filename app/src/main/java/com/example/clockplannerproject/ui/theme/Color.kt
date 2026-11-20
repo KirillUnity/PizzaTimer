@@ -35,6 +35,10 @@ val CompletedWarmGray = Color(0xFF8E8B82)
 
 val EmeraldWork = Color(0xFF2E7D52)
 
+/** Category inks for practice diagrams. Not the now-needle. */
+val OchreCategory = Color(0xFFE59819)
+val CobaltCategory = Color(0xFF2563EB)
+
 /** Dark charcoal slate paper. */
 val NightCanvas = Color(0xFF161513)
 val NightInk = Color(0xFFEDE8DF)

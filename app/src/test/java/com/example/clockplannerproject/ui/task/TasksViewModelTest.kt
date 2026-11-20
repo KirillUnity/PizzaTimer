@@ -1,5 +1,6 @@
 package com.example.clockplannerproject.ui.task
 
+import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
 import com.example.clockplannerproject.data.MockPlannerSource
 import com.example.clockplannerproject.kit.core.Importance
 import com.example.clockplannerproject.kit.core.ReportId
@@ -13,6 +14,7 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TimeProvider
+import com.example.clockplannerproject.kit.core.practice.PracticeSkill
 import com.example.clockplannerproject.kit.core.planner.AcceptedPlan
 import com.example.clockplannerproject.kit.core.planner.PlanOutcome
 import com.example.clockplannerproject.kit.core.planner.PlanRequest
@@ -24,6 +26,7 @@ import com.example.clockplannerproject.kit.core.planner.RussianPlannerPhrases
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -38,6 +41,7 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -87,6 +91,37 @@ class TasksViewModelTest {
         assertNull(viewModel.state.value.editor)
         assertEquals(1, viewModel.state.value.tasks.size)
         assertEquals("Focus", viewModel.state.value.tasks.single().title)
+    }
+
+    @Test
+    fun update_untimedSaveMarksLeftover_timedSaveDoesNot() = runTest {
+        val untimed = InMemoryPracticeProgressStore()
+        val untimedVm = TasksViewModel(
+            FakeTaskRepository(),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+            practice = untimed,
+        )
+        untimedVm.onIntent(TasksUiIntent.Create)
+        untimedVm.onIntent(TasksUiIntent.ChangeTitle("Read"))
+        untimedVm.onIntent(TasksUiIntent.Update)
+        assertTrue(PracticeSkill.LEFTOVER in untimed.observe().first())
+
+        val timed = InMemoryPracticeProgressStore()
+        val timedVm = TasksViewModel(
+            FakeTaskRepository(),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+            practice = timed,
+        )
+        timedVm.onIntent(TasksUiIntent.Create)
+        timedVm.onIntent(TasksUiIntent.ChangeTitle("Focus"))
+        timedVm.onIntent(TasksUiIntent.ChangeScheduled(true))
+        timedVm.onIntent(TasksUiIntent.AddBlock)
+        timedVm.onIntent(TasksUiIntent.ChangeBlockStart(0, 9 * 60))
+        timedVm.onIntent(TasksUiIntent.ChangeBlockEnd(0, 10 * 60))
+        timedVm.onIntent(TasksUiIntent.Update)
+        assertFalse(PracticeSkill.LEFTOVER in timed.observe().first())
     }
 
     @Test

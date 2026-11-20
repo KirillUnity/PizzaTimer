@@ -33,6 +33,9 @@ import com.example.clockplannerproject.kit.core.planner.PlannerPhrases
 import com.example.clockplannerproject.kit.core.planner.PlannerPlanStore
 import com.example.clockplannerproject.kit.core.planner.PlannerSource
 import com.example.clockplannerproject.kit.core.planner.RussianPlannerPhrases
+import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
+import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
+import com.example.clockplannerproject.kit.core.practice.PracticeSkill
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,6 +69,7 @@ class TasksViewModel(
     private val plannerSource: PlannerSource = IdlePlannerSource,
     private val planStore: PlannerPlanStore = IdlePlanStore,
     private val phrases: PlannerPhrases = RussianPlannerPhrases,
+    private val practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
 ) : ViewModel() {
 
     private val selectedDate = MutableStateFlow(timeProvider.today())
@@ -289,7 +293,7 @@ class TasksViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not save note"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_note_save),
                 )
             }
         }
@@ -309,7 +313,7 @@ class TasksViewModel(
                                 date = date,
                                 tasks = tasks,
                                 isLoading = false,
-                                errorMessage = null,
+                                errorMessageRes = null,
                                 nowMinute = minuteOfNow(),
                             )
                         }
@@ -320,11 +324,11 @@ class TasksViewModel(
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = error.message ?: error::class.simpleName,
+                        errorMessageRes = R.string.error_task_load,
                     )
                 }
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not load tasks"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_load),
                 )
             }
         }
@@ -351,13 +355,17 @@ class TasksViewModel(
         }
         viewModelScope.launch {
             try {
-                taskRepository.upsert(editor.toTask())
+                val saved = editor.toTask()
+                taskRepository.upsert(saved)
+                if (saved.isUntimed) {
+                    practice.markTried(PracticeSkill.LEFTOVER)
+                }
                 _state.update { it.copy(editor = null, timePicker = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not save task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_save),
                 )
             }
         }
@@ -379,7 +387,7 @@ class TasksViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not delete task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_delete),
                 )
             }
         }
@@ -428,7 +436,7 @@ class TasksViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_duplicate),
                 )
             }
         }
@@ -444,7 +452,7 @@ class TasksViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_move),
                 )
             }
         }
@@ -500,7 +508,7 @@ class TasksViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task to diagram"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_diagram),
                 )
             }
         }
@@ -759,7 +767,7 @@ class TasksViewModel(
                     }
                 }
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not place the plan"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_plan_place),
                 )
             }
         }

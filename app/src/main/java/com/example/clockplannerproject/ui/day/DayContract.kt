@@ -10,7 +10,7 @@ import com.example.clockplannerproject.kit.core.mvi.UiEffect
 import com.example.clockplannerproject.kit.core.mvi.UiIntent
 import com.example.clockplannerproject.kit.core.mvi.UiState
 import com.example.clockplannerproject.kit.core.time.TaskResize
-import com.example.clockplannerproject.ui.day.flow.PauseMood
+import com.example.clockplannerproject.kit.core.PauseMood
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 
@@ -29,7 +29,8 @@ data class DayUiState(
     val detailsOpen: Boolean = false,
     val pendingDelete: Task? = null,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
+    /** Load-failure string resource, or null after a successful load. */
+    val errorMessageRes: Int? = null,
     val userRotationOffsetDeg: Float = 0f,
     val resizingTaskId: TaskId? = null,
     val resizePreviewEndMinute: Int? = null,
@@ -48,6 +49,8 @@ data class DayUiState(
     val pauseMood: PauseMood = PauseMood.Calm,
     /** Text for the resume chip. Null hides the chip. */
     val resumeCheckpoint: String? = null,
+    /** Mood shown on the resume chip. Null when the chip is hidden. */
+    val resumeMood: PauseMood? = null,
     /** Day-close card under the dial. */
     val showDayClose: Boolean = false,
 ) : UiState {
@@ -131,6 +134,11 @@ sealed interface DayUiIntent : UiIntent {
 }
 
 sealed interface DayUiEffect : UiEffect {
-    data class ShowMessage(val message: String) : DayUiEffect
+    /**
+     * Snackbar copy from resources. The screen resolves [resId] with `stringResource`.
+     *
+     * @param resId failure string in the default and Russian catalogs
+     */
+    data class ShowMessageRes(val resId: Int) : DayUiEffect
     data class OpenEditor(val task: Task) : DayUiEffect
 }

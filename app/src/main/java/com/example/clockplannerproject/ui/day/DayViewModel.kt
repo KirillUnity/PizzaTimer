@@ -1,11 +1,16 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.data.InMemoryAppearanceRepository
+import com.example.clockplannerproject.data.InMemoryFlowMemoryStore
+import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
 import com.example.clockplannerproject.data.SampleDaySeeder
 import com.example.clockplannerproject.kit.core.Appearance
 import com.example.clockplannerproject.kit.core.AppearanceRepository
+import com.example.clockplannerproject.kit.core.FlowMemorySnapshot
+import com.example.clockplannerproject.kit.core.FlowMemoryStore
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
 import com.example.clockplannerproject.kit.core.Task
@@ -15,10 +20,14 @@ import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeProvider
+import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.time.TimeMath
-import com.example.clockplannerproject.ui.day.flow.PauseMood
+import com.example.clockplannerproject.kit.core.PauseMood
+import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
+import com.example.clockplannerproject.kit.core.practice.PracticeSkill
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.plus
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -32,6 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -40,6 +50,9 @@ import kotlinx.coroutines.launch
 /**
  * Day screen ViewModel. Depends on repository, clock, and debug seeder — no Android Context.
  *
+ * While the visible date is still local today, a later [TimeProvider.today] replaces it.
+ * A date chosen with the arrows or the calendar stays until the user returns to today.
+ *
  * @since 0.1.0
  */
 class DayViewModel(
@@ -47,6 +60,8 @@ class DayViewModel(
     private val timeProvider: TimeProvider,
     private val sampleDaySeeder: SampleDaySeeder,
     private val appearanceRepository: AppearanceRepository = InMemoryAppearanceRepository(),
+    private val flowMemory: FlowMemoryStore = InMemoryFlowMemoryStore(),
+    private val practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DayUiState())
@@ -57,6 +72,7 @@ class DayViewModel(
 
     private val retryTick = MutableStateFlow(0)
     private val selectedDate = MutableStateFlow(timeProvider.today())
+    private var followsToday = true
     private var halfSeeded = false
     private val materializer = RecurrenceMaterializer(taskRepository)
     private var latestAppearance = Appearance.Default
@@ -83,24 +99,35 @@ class DayViewModel(
     fun onIntent(intent: DayUiIntent) {
         when (intent) {
             DayUiIntent.Retry -> retryTick.update { it + 1 }
-            is DayUiIntent.SelectTask -> _state.update {
-                if (it.selectedTask?.id == intent.task.id) {
-                    it.copy(selectedTask = null, detailsOpen = false)
-                } else {
-                    it.copy(selectedTask = intent.task, detailsOpen = false)
+            is DayUiIntent.SelectTask -> {
+                val onDial = _state.value.viewMode == ViewMode.DIAL
+                _state.update {
+                    if (it.selectedTask?.id == intent.task.id) {
+                        it.copy(selectedTask = null, detailsOpen = false)
+                    } else {
+                        it.copy(selectedTask = intent.task, detailsOpen = false)
+                    }
                 }
+                refreshFlowChrome()
+                if (onDial) markTried(PracticeSkill.DIAL)
             }
-            is DayUiIntent.OpenTaskDetails -> _state.update {
-                val task = intent.task ?: it.selectedTask
-                if (task == null) {
-                    it
-                } else {
-                    it.copy(selectedTask = task, detailsOpen = true)
+            is DayUiIntent.OpenTaskDetails -> {
+                _state.update {
+                    val task = intent.task ?: it.selectedTask
+                    if (task == null) {
+                        it
+                    } else {
+                        it.copy(selectedTask = task, detailsOpen = true)
+                    }
                 }
+                refreshFlowChrome()
             }
             DayUiIntent.DismissDetails -> _state.update { it.copy(detailsOpen = false) }
-            DayUiIntent.DismissTask -> _state.update {
-                it.copy(selectedTask = null, detailsOpen = false, showMovePicker = false)
+            DayUiIntent.DismissTask -> {
+                _state.update {
+                    it.copy(selectedTask = null, detailsOpen = false, showMovePicker = false)
+                }
+                refreshFlowChrome()
             }
             DayUiIntent.ToggleComplete -> toggleComplete()
             DayUiIntent.EditTask -> openEditor()
@@ -152,25 +179,34 @@ class DayViewModel(
             DayUiIntent.OpenDatePicker -> _state.update { it.copy(showDatePicker = true) }
             DayUiIntent.DismissDatePicker -> _state.update { it.copy(showDatePicker = false) }
             is DayUiIntent.SelectDate -> {
-                clearDayFlow()
-                selectedDate.value = intent.date
+                selectVisibleDate(intent.date)
                 _state.update { it.copy(showDatePicker = false) }
             }
             is DayUiIntent.SetDialHalf -> _state.update { it.copy(dialHalf = intent.half) }
             is DayUiIntent.ChangePauseDraft -> _state.update { it.copy(pauseDraft = intent.text) }
             is DayUiIntent.SelectPauseMood -> _state.update { it.copy(pauseMood = intent.mood) }
             DayUiIntent.CommitPause -> commitPause()
-            DayUiIntent.SkipPause -> _state.update { it.copy(pauseSlipOpen = false) }
-            DayUiIntent.ShowDayClose -> _state.update {
-                it.copy(showDayClose = true, pauseSlipOpen = false)
+            DayUiIntent.SkipPause -> {
+                _state.update { it.copy(pauseSlipOpen = false) }
+                refreshFlowChrome()
             }
-            DayUiIntent.DismissDayClose -> _state.update { it.copy(showDayClose = false) }
+            DayUiIntent.ShowDayClose -> showDayClose()
+            DayUiIntent.DismissDayClose -> dismissDayClose()
         }
     }
 
     private fun shiftDate(days: Int) {
+        selectVisibleDate(selectedDate.value.plus(days, DateTimeUnit.DAY))
+    }
+
+    /**
+     * Shows [date]. Follows the clock again only when [date] is local today
+     * at the moment of the choice.
+     */
+    private fun selectVisibleDate(date: LocalDate) {
         clearDayFlow()
-        selectedDate.update { it.plus(days, DateTimeUnit.DAY) }
+        followsToday = date == timeProvider.today()
+        selectedDate.value = date
     }
 
     private fun clearDayFlow() {
@@ -179,8 +215,6 @@ class DayViewModel(
                 pauseSlipOpen = false,
                 pauseDraft = "",
                 pauseMood = PauseMood.Calm,
-                resumeCheckpoint = null,
-                showDayClose = false,
             )
         }
     }
@@ -196,24 +230,41 @@ class DayViewModel(
     private fun observeDay() {
         viewModelScope.launch {
             retryTick.collectLatest {
-                _state.update { it.copy(isLoading = true, errorMessage = null) }
+                _state.update { it.copy(isLoading = true, errorMessageRes = null) }
                 try {
                     try {
                         sampleDaySeeder.seedIfEmpty()
-                    } catch (seedError: Exception) {
-                        effects.send(
-                            DayUiEffect.ShowMessage(
-                                seedError.message ?: "Could not load sample day",
-                            ),
-                        )
+                    } catch (_: Exception) {
+                        effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_sample))
                     }
                     var lastMaterialized: LocalDate? = null
                     combine(
                         timeProvider.observeTime(),
                         selectedDate.filterNotNull(),
-                    ) { time, date -> date to time }
+                        flowMemory.observe(),
+                    ) { time, date, memory ->
+                        val today = timeProvider.today()
+                        if (followsToday && date != today) {
+                            val half = if (DialHalf.PM.contains(TimeMath.minuteOfDay(time))) {
+                                DialHalf.PM
+                            } else {
+                                DialHalf.AM
+                            }
+                            halfSeeded = true
+                            clearDayFlow()
+                            _state.update { it.copy(dialHalf = half) }
+                            followsToday = true
+                            selectedDate.value = today
+                            DayTick(today, time, memory)
+                        } else {
+                            DayTick(date, time, memory)
+                        }
+                    }
                         .distinctUntilChanged()
-                        .flatMapLatest { (date, time) ->
+                        .flatMapLatest { tick ->
+                            val date = tick.date
+                            val time = tick.time
+                            val memory = tick.memory
                             if (lastMaterialized != date) {
                                 materializer.ensureVisibleDay(date)
                                 lastMaterialized = date
@@ -226,6 +277,10 @@ class DayViewModel(
                                 val pending = current.pendingDelete?.id?.let { id ->
                                     tasks.find { it.id == id }
                                 }
+                                val checkpoint = selected?.let { memory.checkpoint(it.id) }
+                                val showChip = checkpoint != null &&
+                                    !current.pauseSlipOpen &&
+                                    !TaskTimer.hasOpenBlock(selected)
                                 val half = if (!halfSeeded) {
                                     halfSeeded = true
                                     if (DialHalf.PM.contains(TimeMath.minuteOfDay(time))) {
@@ -244,7 +299,7 @@ class DayViewModel(
                                     detailsOpen = current.detailsOpen && selected != null,
                                     pendingDelete = pending,
                                     isLoading = false,
-                                    errorMessage = null,
+                                    errorMessageRes = null,
                                     userRotationOffsetDeg = current.userRotationOffsetDeg,
                                     resizingTaskId = current.resizingTaskId,
                                     resizePreviewEndMinute = current.resizePreviewEndMinute,
@@ -260,24 +315,24 @@ class DayViewModel(
                                     pauseSlipOpen = current.pauseSlipOpen,
                                     pauseDraft = current.pauseDraft,
                                     pauseMood = current.pauseMood,
-                                    resumeCheckpoint = current.resumeCheckpoint,
-                                    showDayClose = current.showDayClose,
+                                    resumeCheckpoint = if (showChip) checkpoint?.text else null,
+                                    resumeMood = if (showChip) checkpoint?.mood else null,
+                                    showDayClose = memory.isDayCloseVisible(date) &&
+                                        !current.pauseSlipOpen,
                                 )
                             }
                         }
                         .collect { snapshot -> _state.value = snapshot }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (error: Exception) {
+                } catch (_: Exception) {
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: error::class.simpleName,
+                            errorMessageRes = R.string.error_day_load,
                         )
                     }
-                    effects.send(
-                        DayUiEffect.ShowMessage(error.message ?: "Could not load the day"),
-                    )
+                    effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_load))
                 }
             }
         }
@@ -326,9 +381,7 @@ class DayViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 clearResizePreview()
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not resize task"),
-                )
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_resize))
             }
         }
     }
@@ -347,7 +400,7 @@ class DayViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not update task"),
+                    DayUiEffect.ShowMessageRes(R.string.error_task_update),
                 )
             }
         }
@@ -375,7 +428,7 @@ class DayViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
+                    DayUiEffect.ShowMessageRes(R.string.error_task_duplicate),
                 )
             }
         }
@@ -393,7 +446,7 @@ class DayViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not move task"),
+                    DayUiEffect.ShowMessageRes(R.string.error_task_move),
                 )
             }
         }
@@ -403,8 +456,14 @@ class DayViewModel(
         val task = _state.value.selectedTask ?: return
         val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
         if (!TaskTimer.canStart(task)) return
-        _state.update { it.copy(resumeCheckpoint = null, showDayClose = false, pauseSlipOpen = false) }
-        persistTimer(TaskTimer.start(task, now))
+        _state.update { it.copy(pauseSlipOpen = false) }
+        val started = TaskTimer.start(task, now)
+        viewModelScope.launch {
+            flowMemory.clearCheckpoint(task.id)
+            if (upsertOrReport(started)) {
+                practice.markTried(PracticeSkill.START)
+            }
+        }
     }
 
     private fun pauseTimer() {
@@ -422,28 +481,92 @@ class DayViewModel(
     }
 
     private fun commitPause() {
-        val text = _state.value.pauseDraft.trim()
+        val snapshot = _state.value
+        val text = snapshot.pauseDraft.trim()
+        val taskId = snapshot.selectedTask?.id
+        val mood = snapshot.pauseMood
         _state.update {
             it.copy(
                 pauseSlipOpen = false,
                 pauseDraft = "",
-                resumeCheckpoint = text.ifEmpty { it.resumeCheckpoint },
             )
+        }
+        if (taskId != null && text.isNotEmpty()) {
+            viewModelScope.launch {
+                flowMemory.saveCheckpoint(taskId, text, mood)
+                practice.markTried(PracticeSkill.CHECKPOINT)
+            }
+        } else {
+            refreshFlowChrome()
+        }
+    }
+
+    /**
+     * Reapplies the stored chip and day-close card after a local slip change
+     * that does not itself write the store.
+     */
+    private fun refreshFlowChrome() {
+        viewModelScope.launch {
+            val memory = flowMemory.observe().first()
+            _state.update { current ->
+                val selected = current.selectedTask
+                val checkpoint = selected?.let { memory.checkpoint(it.id) }
+                val showChip = checkpoint != null &&
+                    !current.pauseSlipOpen &&
+                    !TaskTimer.hasOpenBlock(selected)
+                val date = current.date
+                current.copy(
+                    resumeCheckpoint = if (showChip) checkpoint?.text else null,
+                    resumeMood = if (showChip) checkpoint?.mood else null,
+                    showDayClose = date != null &&
+                        memory.isDayCloseVisible(date) &&
+                        !current.pauseSlipOpen,
+                )
+            }
+        }
+    }
+
+    private fun showDayClose() {
+        val date = _state.value.date ?: return
+        _state.update { it.copy(pauseSlipOpen = false) }
+        viewModelScope.launch {
+            flowMemory.markDayClosed(date)
+            practice.markTried(PracticeSkill.DAY_CLOSE)
+        }
+    }
+
+    private fun dismissDayClose() {
+        val date = _state.value.date ?: return
+        viewModelScope.launch {
+            flowMemory.dismissDayClose(date)
         }
     }
 
     private fun persistTimer(updated: Task) {
-        viewModelScope.launch {
-            try {
-                taskRepository.upsert(updated)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not update timer"),
-                )
-            }
+        viewModelScope.launch { upsertOrReport(updated) }
+    }
+
+    /**
+     * Writes [updated]. A failed write reports the existing timer message
+     * and returns false so a practice flag is not set for a start that
+     * did not stick.
+     */
+    private suspend fun upsertOrReport(updated: Task): Boolean {
+        try {
+            taskRepository.upsert(updated)
+            return true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            effects.send(
+                DayUiEffect.ShowMessageRes(R.string.error_day_timer),
+            )
+            return false
         }
+    }
+
+    private fun markTried(skill: PracticeSkill) {
+        viewModelScope.launch { practice.markTried(skill) }
     }
 
     private fun confirmDelete() {
@@ -464,9 +587,15 @@ class DayViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not delete task"),
+                    DayUiEffect.ShowMessageRes(R.string.error_task_delete),
                 )
             }
         }
     }
 }
+
+private data class DayTick(
+    val date: LocalDate,
+    val time: LocalTime,
+    val memory: FlowMemorySnapshot,
+)

@@ -104,7 +104,6 @@ fun TasksRoute(
         LaunchedEffect(viewModel) {
             viewModel.effect.collect { effect ->
                 when (effect) {
-                    is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
                     is TasksUiEffect.ShowMessageRes ->
                         snackbarHostState.showSnackbar(context.getString(effect.resId))
                 }
@@ -151,7 +150,7 @@ fun TasksScreen(
     Box(modifier = modifier.fillMaxSize()) {
         ResponsiveTaskGrid(
             tasks = state.visibleTasks,
-            showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessage == null,
+            showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessageRes == null,
             onEdit = { onIntent(TasksUiIntent.Edit(it)) },
             header = {
                 PaperDateHeader(
@@ -178,9 +177,9 @@ fun TasksScreen(
                         onSelect = { onIntent(TasksUiIntent.FilterByTag(it)) },
                     )
                 }
-                state.errorMessage?.let { message ->
+                state.errorMessageRes?.let { messageRes ->
                     Text(
-                        text = message,
+                        text = stringResource(messageRes),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp),
                     )

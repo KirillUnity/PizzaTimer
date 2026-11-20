@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.kit.core.PauseMood
 import com.example.clockplannerproject.kit.core.Task
 
 /**
@@ -37,6 +38,7 @@ fun DayFlowColumn(
     pauseDraft: String,
     pauseMood: PauseMood,
     resumeCheckpoint: String?,
+    resumeMood: PauseMood? = null,
     showDayClose: Boolean,
     onDraft: (String) -> Unit,
     onMood: (PauseMood) -> Unit,
@@ -71,6 +73,7 @@ fun DayFlowColumn(
             if (!pauseOpen && !showDayClose && checkpoint.isNotBlank()) {
                 ResumeCheckpointChip(
                     checkpoint = checkpoint,
+                    mood = resumeMood,
                     onResume = onResume,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

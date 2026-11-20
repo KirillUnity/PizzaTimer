@@ -1,0 +1,19 @@
+---
+description: OpenSpec change cycle and secret-file boundary for TimeDial
+alwaysApply: true
+---
+
+# Spec-driven changes
+
+Any code change belongs to an active OpenSpec change under `openspec/changes/<name>/`. If none exists, create one with `/openspec-propose` before editing Kotlin, Gradle, or `openspec/specs/`. The same step answers to “opsx propose”.
+
+Cycle: propose → implement `tasks.md` (`/openspec-apply-change`) → `:app:testDebugUnitTest` → `/openspec-archive-change`. Do not archive while tests fail. Do not edit `openspec/specs/` by hand; archive merges the delta. Skills live in `.agents/skills/`.
+
+Mission intent: `spec/mission.md`. Shipped contracts: `openspec/specs/`. Preservation baselines are the task list, the flow session, and the day dial.
+
+```text
+# ❌ BAD — patch DayViewModel with no change folder
+# ✅ GOOD — /opsx-propose fix-pause-checkpoint, then edit, test, /opsx-archive
+```
+
+Before sending a file to the LLM, check `.cursorignore`. Agent, Tab, and `@` mentions skip those paths. The terminal and MCP do not. Do not add production keys to the working tree.

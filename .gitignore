@@ -44,12 +44,24 @@ captures/
 Thumbs.db
 Desktop.ini
 
-# Cursor / editor local state (keep committed rules)
+# Cursor / editor local state (keep rules, OpenSpec commands, and skills)
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/commands/
+!.cursor/commands/**
+!.cursor/skills/
+!.cursor/skills/**
 
-# Optional secrets
+# Optional secrets. .cursorignore blocks Agent and Tab; git must not store them either.
 google-services.json
 .env
 .env.*
+**/secrets.json
+**/credentials.json
+**/*.key
+**/id_rsa
+config/production.json
+config/secrets.yaml
+.npmrc
+.pypirc

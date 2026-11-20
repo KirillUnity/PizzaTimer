@@ -49,10 +49,10 @@ fun DayCloseCard(
 ) {
     val hours = closedMinutes / 60
     val mins = closedMinutes % 60
-    val hoursLabel = if (hours <= 0) {
-        stringResource(R.string.flow_closed_minutes, mins)
-    } else {
-        stringResource(R.string.flow_closed_hours, hours, mins)
+    val hoursLabel = when {
+        closedMinutes <= 0 -> stringResource(R.string.flow_closed_none)
+        hours <= 0 -> stringResource(R.string.flow_closed_minutes, mins)
+        else -> stringResource(R.string.flow_closed_hours, hours, mins)
     }
     val line = checkpoint.ifBlank { stringResource(R.string.flow_pause_helper) }
     val reportsCd = stringResource(R.string.cd_flow_open_reports)

@@ -3,6 +3,7 @@ package com.example.clockplannerproject.ui.day.flow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.kit.core.PauseMood
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.OnTerracotta
 import com.example.clockplannerproject.ui.theme.PaperSurface
@@ -36,6 +38,7 @@ import com.example.clockplannerproject.ui.theme.TerracottaNow
  *
  * @param checkpoint words saved from the pause slip
  * @param onResume starts the next interval; it does not edit the closed one
+ * @param mood focus saved with [checkpoint]; same labels as the pause slip
  * @since 1.1.0
  */
 @Composable
@@ -43,8 +46,10 @@ fun ResumeCheckpointChip(
     checkpoint: String,
     onResume: () -> Unit,
     modifier: Modifier = Modifier,
+    mood: PauseMood? = null,
 ) {
     val label = stringResource(R.string.flow_resume_chip, checkpoint)
+    val moodLabel = mood?.let { stringResource(it.labelRes()) }
     val resumeCd = stringResource(R.string.cd_flow_resume)
     Surface(
         modifier = modifier,
@@ -56,14 +61,24 @@ fun ResumeCheckpointChip(
             modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 200.dp),
-            )
+            Column(modifier = Modifier.widthIn(max = 200.dp)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (moodLabel != null) {
+                    Text(
+                        text = moodLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .padding(start = 8.dp)
@@ -90,7 +105,14 @@ private fun ResumeCheckpointChipPreview() {
     ClockPlannerProjectTheme {
         ResumeCheckpointChip(
             checkpoint = "цифры за четверг",
+            mood = PauseMood.Deep,
             onResume = {},
         )
     }
+}
+
+private fun PauseMood.labelRes(): Int = when (this) {
+    PauseMood.Calm -> R.string.flow_mood_calm
+    PauseMood.Deep -> R.string.flow_mood_deep
+    PauseMood.Stuck -> R.string.flow_mood_stuck
 }

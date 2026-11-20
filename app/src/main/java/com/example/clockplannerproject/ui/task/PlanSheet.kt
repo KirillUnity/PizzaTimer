@@ -255,11 +255,27 @@ fun PlanSheet(
     }
 }
 
+/**
+ * Calm line that the plan is calculated on this phone.
+ *
+ * Shown before the request and again on the draft. It does not depend on the network.
+ */
+@Composable
+private fun OnDevicePlanningNote() {
+    Text(
+        text = stringResource(R.string.planner_on_device),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun PlanFormBody(
     form: PlanFormState,
     onIntent: (TasksUiIntent) -> Unit,
 ) {
+    OnDevicePlanningNote()
+    Spacer(Modifier.height(8.dp))
     Text(
         text = stringResource(R.string.planner_sheet_hint),
         style = MaterialTheme.typography.bodyMedium,
@@ -272,6 +288,11 @@ private fun PlanFormBody(
         label = { Text(stringResource(R.string.planner_goal_label)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
+    )
+    PlannerMockHint(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
     )
     Spacer(Modifier.height(12.dp))
     DeadlineButton(date = form.deadline, onIntent = onIntent)
@@ -309,6 +330,8 @@ private fun PlanDraftBody(
     draft: PlanDraftUi,
     onIntent: (TasksUiIntent) -> Unit,
 ) {
+    OnDevicePlanningNote()
+    Spacer(Modifier.height(8.dp))
     VerdictBanner(verdict = draft.draft.verdict, narrative = draft.draft.narrative)
     Spacer(Modifier.height(12.dp))
     MinuteStats(

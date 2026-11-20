@@ -5,8 +5,8 @@ import androidx.compose.runtime.Immutable
 /**
  * What sits behind the DIAL and PIZZA faces.
  *
- * [UserImage] is part of the API. The product shows a "coming" stub and does
- * not open a photo picker.
+ * [UserImage] holds a path inside the app files directory. The bytes are
+ * copied there from the system photo picker. A missing file draws like [None].
  *
  * @since 1.0.0
  */
@@ -30,9 +30,9 @@ sealed interface BackgroundConfig {
     data class Preset(val name: String) : BackgroundConfig
 
     /**
-     * Reserved for a user photo. v1.0-android does not copy a photo.
+     * User photo copied into the app files directory.
      *
-     * @param uri unused placeholder; may be empty
+     * @param uri absolute path of that copy, not a content URI
      */
     data class UserImage(val uri: String) : BackgroundConfig
 

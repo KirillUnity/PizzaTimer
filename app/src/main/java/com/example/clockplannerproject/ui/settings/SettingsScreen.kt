@@ -1,5 +1,8 @@
 package com.example.clockplannerproject.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,10 +28,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -43,7 +51,9 @@ import com.example.clockplannerproject.kit.core.Appearance
 import com.example.clockplannerproject.kit.core.AppearancePalette
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.BackgroundConfig
+import com.example.clockplannerproject.kit.compose.userUnderlayReadable
 import com.example.clockplannerproject.kit.core.config.BackgroundPresets
+import com.example.clockplannerproject.ui.settings.practice.PracticeDestination
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.PaperCanvas
 import com.example.clockplannerproject.ui.theme.PaperSecondary
@@ -59,22 +69,51 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun SettingsDestinationContent(
     onShowOnboarding: () -> Unit,
+    onOpenDay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var practiceOpen by rememberSaveable { mutableStateOf(false) }
+    if (practiceOpen && !LocalInspectionMode.current) {
+        PracticeDestination(
+            onBack = { practiceOpen = false },
+            onOpenDay = onOpenDay,
+            onShowIntroduction = onShowOnboarding,
+            modifier = modifier,
+        )
+        return
+    }
     if (LocalInspectionMode.current) {
         SettingsScreen(
             appearance = Appearance.Default,
             onAppearance = {},
             onShowOnboarding = onShowOnboarding,
+            onOpenPractice = {},
+            onPickPhoto = {},
             modifier = modifier,
         )
     } else {
         val viewModel: SettingsViewModel = koinViewModel()
         val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        val picker = rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            viewModel.importPhoto {
+                context.contentResolver.openInputStream(uri)
+                    ?: error("Could not read photo")
+            }
+        }
         SettingsScreen(
             appearance = appearance,
             onAppearance = viewModel::save,
             onShowOnboarding = onShowOnboarding,
+            onOpenPractice = { practiceOpen = true },
+            onPickPhoto = {
+                picker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
             modifier = modifier,
         )
     }
@@ -83,9 +122,10 @@ fun SettingsDestinationContent(
 /**
  * Paper settings: default view, accent, completed color, dial underlay.
  *
- * [BackgroundConfig.UserImage] is selectable and shows a coming-soon note.
- * It does not open a photo picker.
+ * «Своё фото» opens the system photo picker. The stored path is an app file.
+ * A missing file shows [R.string.background_user_missing].
  *
+ * @param onPickPhoto launches the image picker; the caller copies the result
  * @since 1.0.0
  */
 @Composable
@@ -93,6 +133,8 @@ fun SettingsScreen(
     appearance: Appearance,
     onAppearance: (Appearance) -> Unit,
     onShowOnboarding: () -> Unit,
+    onOpenPractice: () -> Unit,
+    onPickPhoto: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -142,10 +184,15 @@ fun SettingsScreen(
         BackgroundChips(
             selected = appearance.background,
             onSelect = { onAppearance(appearance.copy(background = it)) },
+            onPickPhoto = onPickPhoto,
         )
-        if (appearance.background is BackgroundConfig.UserImage) {
+        val photoPath = (appearance.background as? BackgroundConfig.UserImage)?.uri
+        val photoMissing = remember(photoPath) {
+            photoPath != null && !userUnderlayReadable(photoPath)
+        }
+        if (photoMissing) {
             Text(
-                text = stringResource(R.string.background_user_coming),
+                text = stringResource(R.string.background_user_missing),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -168,6 +215,19 @@ fun SettingsScreen(
                 checked = appearance.darkTheme,
                 onCheckedChange = { onAppearance(appearance.copy(darkTheme = it)) },
                 modifier = Modifier.semantics { contentDescription = darkCd },
+            )
+        }
+        val practiceCd = stringResource(R.string.cd_settings_practice)
+        TextButton(
+            onClick = onOpenPractice,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .semantics { contentDescription = practiceCd },
+        ) {
+            Text(
+                text = stringResource(R.string.settings_practice),
+                style = MaterialTheme.typography.titleMedium,
             )
         }
         val replayCd = stringResource(R.string.cd_show_onboarding)
@@ -333,6 +393,7 @@ private fun ColorSwatches(
 private fun BackgroundChips(
     selected: BackgroundConfig,
     onSelect: (BackgroundConfig) -> Unit,
+    onPickPhoto: () -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -367,7 +428,7 @@ private fun BackgroundChips(
         BackgroundChip(
             label = stringResource(R.string.background_user_image),
             picked = selected is BackgroundConfig.UserImage,
-            onClick = { onSelect(BackgroundConfig.UserImage("")) },
+            onClick = onPickPhoto,
         )
     }
 }
@@ -398,6 +459,8 @@ private fun SettingsScreenPreview() {
             ),
             onAppearance = {},
             onShowOnboarding = {},
+            onOpenPractice = {},
+            onPickPhoto = {},
         )
     }
 }

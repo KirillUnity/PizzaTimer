@@ -1,0 +1,23 @@
+schema: spec-driven
+skillsScope: project
+
+context: |
+  Project: TimeDial (repo ClockPlannerProject), product mission «Поток» in spec/mission.md (draft 0.3).
+  Stack: Kotlin 2.0.21, AGP 8.13.2, Compose BOM 2024.09.00, Material 3, MVI (UiState/UiIntent/UiEffect), Koin 4.0.2, Room 2.6.1, DataStore, kotlinx-datetime 0.6.2. Single module :app, namespace com.example.clockplannerproject, minSdk 29, targetSdk 36.
+  Packages: kit.core, kit.render, kit.compose, data, di, ui.day, ui.task, ui.settings, ui.stats.
+  Constraints: no Hilt, no KMP, no Room Migration classes (version++ and fallbackToDestructiveMigration only), kit.render must not import Room or ui, UI must not reimplement TimeMath or leftover shares, closed TimeBlocks are immutable, Start/Pause appends intervals.
+  Commands: gradlew.bat :app:testDebugUnitTest and gradlew.bat :app:assembleDebug.
+  Specs are preservation contracts for shipped behavior. The learning library in mission section 7 is not in this build.
+  Write artifacts in English. Keep SHALL/MUST and scenario headings in English. Cite mission sections by number.
+
+rules:
+  proposal:
+    - State which mission section the change serves
+    - State what already-shipped behavior must stay intact
+    - Keep the proposal under 400 words
+  specs:
+    - Use SHALL/MUST and WHEN/THEN scenarios
+    - Name existing unit tests that lock the requirement when they exist
+  tasks:
+    - Include running :app:testDebugUnitTest before archive
+    - Do not add tasks that rewrite the dial, add Hilt, or add Room migrations

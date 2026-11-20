@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.kit.core.PauseMood
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.OnTerracotta
 import com.example.clockplannerproject.ui.theme.PaperSurface

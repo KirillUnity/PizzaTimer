@@ -37,6 +37,7 @@ import kotlinx.datetime.LocalTime
 
 /**
  * Compact Start / Pause in the ring hole (and pizza / petals hub).
+ * The control is an icon only. The spoken name stays on the icon.
  *
  * @since 0.4.0
  */
@@ -72,11 +73,6 @@ fun TimerHoleOverlay(
                     contentDescription = pauseCd,
                 )
             }
-            Text(
-                text = stringResource(R.string.timer_pause),
-                style = MaterialTheme.typography.labelSmall,
-                color = TerracottaNow,
-            )
         } else {
             FilledIconButton(
                 onClick = onStart,
@@ -89,11 +85,6 @@ fun TimerHoleOverlay(
                     contentDescription = startCd,
                 )
             }
-            Text(
-                text = stringResource(R.string.timer_start),
-                style = MaterialTheme.typography.labelSmall,
-                color = TerracottaNow,
-            )
         }
     }
 }
@@ -131,7 +122,7 @@ fun LiveChronoHole(
 }
 
 /**
- * Running DIAL hole: flow label, elapsed, task title, session caption, and Pause.
+ * Running DIAL hole: flow label, elapsed, task title, session caption, and a pause icon.
  * On a short hole the title and caption drop so elapsed and Pause stay visible.
  *
  * @param holeDiameter inner diameter of the ring, in dp
@@ -196,13 +187,6 @@ fun RunningSessionHole(
                 contentDescription = pauseCd,
             )
         }
-        Text(
-            text = stringResource(R.string.timer_pause),
-            style = MaterialTheme.typography.labelSmall,
-            color = TerracottaNow,
-            maxLines = 1,
-            softWrap = false,
-        )
     }
 }
 

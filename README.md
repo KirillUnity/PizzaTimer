@@ -158,7 +158,7 @@ That job checks out the repo, sets up **JDK 17**, validates the Gradle wrapper, 
 
 The Gradle user-home cache is enabled (`gradle/actions/setup-gradle`, `cache-provider: basic`). The workflow does not use secrets, a signing keystore, or `google-services.json`.
 
-Docs: [docs/TZ.md](docs/TZ.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [docs/PLAY_CHECKLIST.md](docs/PLAY_CHECKLIST.md) · [AGENTS.md](AGENTS.md)
+Docs: [docs/TZ.md](docs/TZ.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [docs/PLAY_CHECKLIST.md](docs/PLAY_CHECKLIST.md) · [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
