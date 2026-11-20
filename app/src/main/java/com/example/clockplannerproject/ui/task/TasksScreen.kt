@@ -52,7 +52,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,17 +102,25 @@ fun TasksRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var snackbarResId by remember { mutableStateOf<Int?>(null) }
+    var snackbarNonce by remember { mutableIntStateOf(0) }
     if (showEditorOverlays) {
         LaunchedEffect(viewModel) {
             viewModel.effect.collect { effect ->
                 when (effect) {
-                    is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
-                    is TasksUiEffect.ShowMessageRes ->
-                        snackbarHostState.showSnackbar(context.getString(effect.resId))
+                    is TasksUiEffect.ShowMessageRes -> {
+                        snackbarResId = effect.resId
+                        snackbarNonce += 1
+                    }
                 }
             }
         }
+    }
+    val snackbarText = snackbarResId?.let { stringResource(it) }
+    LaunchedEffect(snackbarNonce) {
+        val text = snackbarText ?: return@LaunchedEffect
+        if (snackbarNonce == 0) return@LaunchedEffect
+        snackbarHostState.showSnackbar(text)
     }
     TasksScreen(
         state = state,
@@ -151,7 +162,7 @@ fun TasksScreen(
     Box(modifier = modifier.fillMaxSize()) {
         ResponsiveTaskGrid(
             tasks = state.visibleTasks,
-            showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessage == null,
+            showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessageRes == null,
             onEdit = { onIntent(TasksUiIntent.Edit(it)) },
             header = {
                 PaperDateHeader(
@@ -178,9 +189,9 @@ fun TasksScreen(
                         onSelect = { onIntent(TasksUiIntent.FilterByTag(it)) },
                     )
                 }
-                state.errorMessage?.let { message ->
+                state.errorMessageRes?.let { messageRes ->
                     Text(
-                        text = message,
+                        text = stringResource(messageRes),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp),
                     )

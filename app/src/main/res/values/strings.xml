@@ -276,4 +276,18 @@
     <string name="flow_closed_minutes">%1$d min</string>
     <string name="flow_open_reports">To reports</string>
     <string name="cd_flow_open_reports">Open reports</string>
+    <string name="error_day_load">Could not load the day</string>
+    <string name="error_day_sample">Could not load the sample day</string>
+    <string name="error_day_resize">Could not resize the task</string>
+    <string name="error_task_update">Could not update the task</string>
+    <string name="error_task_duplicate">Could not duplicate the task</string>
+    <string name="error_task_move">Could not move the task</string>
+    <string name="error_day_timer">Could not update the timer</string>
+    <string name="error_task_delete">Could not delete the task</string>
+    <string name="error_note_save">Could not save the note</string>
+    <string name="error_task_load">Could not load tasks</string>
+    <string name="error_task_save">Could not save the task</string>
+    <string name="error_task_diagram">Could not move the task onto the diagram</string>
+    <string name="error_plan_place">Could not place the plan</string>
+    <string name="error_report_collect">Could not collect the report</string>
 </resources>

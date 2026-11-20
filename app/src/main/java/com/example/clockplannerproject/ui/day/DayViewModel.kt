@@ -2,6 +2,7 @@ package com.example.clockplannerproject.ui.day
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.InMemoryAppearanceRepository
 import com.example.clockplannerproject.data.SampleDaySeeder
 import com.example.clockplannerproject.kit.core.Appearance
@@ -196,16 +197,12 @@ class DayViewModel(
     private fun observeDay() {
         viewModelScope.launch {
             retryTick.collectLatest {
-                _state.update { it.copy(isLoading = true, errorMessage = null) }
+                _state.update { it.copy(isLoading = true, errorMessageRes = null) }
                 try {
                     try {
                         sampleDaySeeder.seedIfEmpty()
-                    } catch (seedError: Exception) {
-                        effects.send(
-                            DayUiEffect.ShowMessage(
-                                seedError.message ?: "Could not load sample day",
-                            ),
-                        )
+                    } catch (_: Exception) {
+                        effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_sample))
                     }
                     var lastMaterialized: LocalDate? = null
                     combine(
@@ -244,7 +241,7 @@ class DayViewModel(
                                     detailsOpen = current.detailsOpen && selected != null,
                                     pendingDelete = pending,
                                     isLoading = false,
-                                    errorMessage = null,
+                                    errorMessageRes = null,
                                     userRotationOffsetDeg = current.userRotationOffsetDeg,
                                     resizingTaskId = current.resizingTaskId,
                                     resizePreviewEndMinute = current.resizePreviewEndMinute,
@@ -268,16 +265,14 @@ class DayViewModel(
                         .collect { snapshot -> _state.value = snapshot }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (error: Exception) {
+                } catch (_: Exception) {
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: error::class.simpleName,
+                            errorMessageRes = R.string.error_day_load,
                         )
                     }
-                    effects.send(
-                        DayUiEffect.ShowMessage(error.message ?: "Could not load the day"),
-                    )
+                    effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_load))
                 }
             }
         }
@@ -324,11 +319,9 @@ class DayViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 clearResizePreview()
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not resize task"),
-                )
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_resize))
             }
         }
     }
@@ -345,10 +338,8 @@ class DayViewModel(
                 taskRepository.upsert(task.copy(status = nextStatus))
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not update task"),
-                )
+            } catch (_: Exception) {
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_task_update))
             }
         }
     }
@@ -373,10 +364,8 @@ class DayViewModel(
                 taskRepository.upsert(copy)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
-                )
+            } catch (_: Exception) {
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_task_duplicate))
             }
         }
     }
@@ -391,10 +380,8 @@ class DayViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not move task"),
-                )
+            } catch (_: Exception) {
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_task_move))
             }
         }
     }
@@ -438,10 +425,8 @@ class DayViewModel(
                 taskRepository.upsert(updated)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not update timer"),
-                )
+            } catch (_: Exception) {
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_day_timer))
             }
         }
     }
@@ -462,10 +447,8 @@ class DayViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                effects.send(
-                    DayUiEffect.ShowMessage(error.message ?: "Could not delete task"),
-                )
+            } catch (_: Exception) {
+                effects.send(DayUiEffect.ShowMessageRes(R.string.error_task_delete))
             }
         }
     }

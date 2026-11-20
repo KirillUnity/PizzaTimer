@@ -29,7 +29,8 @@ data class DayUiState(
     val detailsOpen: Boolean = false,
     val pendingDelete: Task? = null,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
+    /** Load-failure string resource, or null after a successful load. */
+    val errorMessageRes: Int? = null,
     val userRotationOffsetDeg: Float = 0f,
     val resizingTaskId: TaskId? = null,
     val resizePreviewEndMinute: Int? = null,
@@ -131,6 +132,11 @@ sealed interface DayUiIntent : UiIntent {
 }
 
 sealed interface DayUiEffect : UiEffect {
-    data class ShowMessage(val message: String) : DayUiEffect
+    /**
+     * Snackbar copy from resources. The screen resolves [resId] with `stringResource`.
+     *
+     * @param resId failure string in the default and Russian catalogs
+     */
+    data class ShowMessageRes(val resId: Int) : DayUiEffect
     data class OpenEditor(val task: Task) : DayUiEffect
 }

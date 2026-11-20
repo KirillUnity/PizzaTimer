@@ -287,9 +287,9 @@ class TasksViewModel(
                 _state.update { it.copy(reportDraft = "", editingReportId = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not save note"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_note_save),
                 )
             }
         }
@@ -309,22 +309,22 @@ class TasksViewModel(
                                 date = date,
                                 tasks = tasks,
                                 isLoading = false,
-                                errorMessage = null,
+                                errorMessageRes = null,
                                 nowMinute = minuteOfNow(),
                             )
                         }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = error.message ?: error::class.simpleName,
+                        errorMessageRes = R.string.error_task_load,
                     )
                 }
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not load tasks"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_load),
                 )
             }
         }
@@ -355,9 +355,9 @@ class TasksViewModel(
                 _state.update { it.copy(editor = null, timePicker = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not save task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_save),
                 )
             }
         }
@@ -377,9 +377,9 @@ class TasksViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not delete task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_delete),
                 )
             }
         }
@@ -426,9 +426,9 @@ class TasksViewModel(
                 taskRepository.upsert(copy)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not duplicate task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_duplicate),
                 )
             }
         }
@@ -442,9 +442,9 @@ class TasksViewModel(
                 _state.update { it.copy(pendingMove = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_move),
                 )
             }
         }
@@ -498,9 +498,9 @@ class TasksViewModel(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not move task to diagram"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_task_diagram),
                 )
             }
         }
@@ -751,7 +751,7 @@ class TasksViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 if (generation == planGeneration) {
                     _state.update { current ->
                         val open = current.planSheet as? PlanSheetUi.Draft ?: return@update current
@@ -759,7 +759,7 @@ class TasksViewModel(
                     }
                 }
                 effects.send(
-                    TasksUiEffect.ShowMessage(error.message ?: "Could not place the plan"),
+                    TasksUiEffect.ShowMessageRes(R.string.error_plan_place),
                 )
             }
         }

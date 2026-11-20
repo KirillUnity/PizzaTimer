@@ -1,5 +1,6 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.SampleDaySeeder
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskId
@@ -262,6 +263,29 @@ class DayViewModelTest {
         assertNull(viewModel.state.value.pendingDelete)
     }
 
+    @Test
+    fun toggleComplete_repositoryFailure_emitsResourceNotEnglishSentence() {
+        val repository = FakeTaskRepository(listOf(work), failUpsert = true)
+        val time = FakeTimeProvider(date)
+        val viewModel = DayViewModel(
+            taskRepository = repository,
+            timeProvider = time,
+            sampleDaySeeder = SampleDaySeeder(repository, time),
+        )
+        val messages = mutableListOf<DayUiEffect>()
+        val job = kotlinx.coroutines.CoroutineScope(dispatcher).launch {
+            viewModel.effect.collect { messages += it }
+        }
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.ToggleComplete)
+        job.cancel()
+
+        val effect = messages.filterIsInstance<DayUiEffect.ShowMessageRes>().single()
+        assertEquals(R.string.error_task_update, effect.resId)
+        assertFalse(effect.toString().contains("Could not update the task"))
+        assertEquals(TaskStatus.TODO, viewModel.state.value.tasks.single().status)
+    }
+
     private fun dayViewModel(
         initial: List<Task>,
         clock: LocalTime = LocalTime(9, 30),
@@ -278,6 +302,7 @@ class DayViewModelTest {
 
 private class FakeTaskRepository(
     initial: List<Task> = emptyList(),
+    private val failUpsert: Boolean = false,
 ) : TaskRepository {
     private val items = MutableStateFlow(initial)
 
@@ -290,6 +315,9 @@ private class FakeTaskRepository(
     override fun observeAll(): Flow<List<Task>> = items
 
     override suspend fun upsert(task: Task) {
+        if (failUpsert) {
+            throw IllegalStateException("Could not update the task")
+        }
         items.update { current -> current.filterNot { it.id == task.id } + task }
     }
 

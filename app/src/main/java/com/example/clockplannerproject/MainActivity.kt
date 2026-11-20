@@ -35,6 +35,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -114,17 +115,25 @@ private fun ClockPlannerProjectNav(
         mutableStateOf(AppDestinations.DAY)
     }
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var snackbarResId by remember { mutableStateOf<Int?>(null) }
+    var snackbarNonce by remember { mutableIntStateOf(0) }
     if (tasksViewModel != null) {
         LaunchedEffect(tasksViewModel) {
             tasksViewModel.effect.collect { effect ->
                 when (effect) {
-                    is TasksUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
-                    is TasksUiEffect.ShowMessageRes ->
-                        snackbarHostState.showSnackbar(context.getString(effect.resId))
+                    is TasksUiEffect.ShowMessageRes -> {
+                        snackbarResId = effect.resId
+                        snackbarNonce += 1
+                    }
                 }
             }
         }
+    }
+    val snackbarText = snackbarResId?.let { stringResource(it) }
+    LaunchedEffect(snackbarNonce) {
+        val text = snackbarText ?: return@LaunchedEffect
+        if (snackbarNonce == 0) return@LaunchedEffect
+        snackbarHostState.showSnackbar(text)
     }
     val showFab = currentDestination == AppDestinations.TASKS
     val suiteType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(

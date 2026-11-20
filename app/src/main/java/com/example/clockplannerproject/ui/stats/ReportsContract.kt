@@ -34,6 +34,17 @@ sealed interface ReportsUiIntent : UiIntent {
 }
 
 sealed interface ReportsUiEffect : UiEffect {
+    /**
+     * Already localized planner copy. Not a repository fallback.
+     *
+     * @param message phrase from [com.example.clockplannerproject.kit.core.planner.PlannerPhrases]
+     */
     data class ShowMessage(val message: String) : ReportsUiEffect
+
+    /**
+     * Snackbar copy from resources. The screen resolves [resId] with `stringResource`.
+     *
+     * @param resId failure string in the default and Russian catalogs
+     */
     data class ShowMessageRes(val resId: Int) : ReportsUiEffect
 }

@@ -276,4 +276,18 @@
     <string name="flow_closed_minutes">%1$d мин</string>
     <string name="flow_open_reports">В отчёты</string>
     <string name="cd_flow_open_reports">Открыть отчёты</string>
+    <string name="error_day_load">Не удалось загрузить день</string>
+    <string name="error_day_sample">Не удалось загрузить пример дня</string>
+    <string name="error_day_resize">Не удалось изменить размер задачи</string>
+    <string name="error_task_update">Не удалось обновить задачу</string>
+    <string name="error_task_duplicate">Не удалось скопировать задачу</string>
+    <string name="error_task_move">Не удалось перенести задачу</string>
+    <string name="error_day_timer">Не удалось обновить таймер</string>
+    <string name="error_task_delete">Не удалось удалить задачу</string>
+    <string name="error_note_save">Не удалось сохранить заметку</string>
+    <string name="error_task_load">Не удалось загрузить задачи</string>
+    <string name="error_task_save">Не удалось сохранить задачу</string>
+    <string name="error_task_diagram">Не удалось перенести задачу на диаграмму</string>
+    <string name="error_plan_place">Не удалось поставить план</string>
+    <string name="error_report_collect">Не удалось собрать отчёт</string>
 </resources>

@@ -93,7 +93,7 @@ data class TasksUiState(
     val showDatePicker: Boolean = false,
     val pendingDelete: Task? = null,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
+    val errorMessageRes: Int? = null,
     val selectedProject: String? = null,
     val selectedTag: String? = null,
     val projectSearch: String = "",
@@ -300,6 +300,10 @@ sealed interface PlanSheetUi {
 }
 
 sealed interface TasksUiEffect : UiEffect {
-    data class ShowMessage(val message: String) : TasksUiEffect
+    /**
+     * Snackbar copy from resources. The screen resolves [resId] with `stringResource`.
+     *
+     * @param resId failure string in the default and Russian catalogs
+     */
     data class ShowMessageRes(val resId: Int) : TasksUiEffect
 }

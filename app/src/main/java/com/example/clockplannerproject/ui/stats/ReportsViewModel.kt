@@ -147,10 +147,8 @@ class ReportsViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                val message = error.message ?: "Could not collect the report"
-                _state.update { it.copy(errorMessage = message) }
-                effects.send(ReportsUiEffect.ShowMessage(message))
+            } catch (_: Exception) {
+                effects.send(ReportsUiEffect.ShowMessageRes(R.string.error_report_collect))
             } finally {
                 _state.update { it.copy(isCollecting = false) }
             }
@@ -239,9 +237,9 @@ class ReportsViewModel(
                 _state.update { it.copy(draft = "", editingId = null, editingTaskId = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 effects.send(
-                    ReportsUiEffect.ShowMessage(error.message ?: "Could not save note"),
+                    ReportsUiEffect.ShowMessageRes(R.string.error_note_save),
                 )
             }
         }

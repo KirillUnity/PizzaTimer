@@ -34,7 +34,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -87,13 +90,24 @@ fun DayRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var snackbarResId by remember { mutableStateOf<Int?>(null) }
+    var snackbarNonce by remember { mutableIntStateOf(0) }
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is DayUiEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
+                is DayUiEffect.ShowMessageRes -> {
+                    snackbarResId = effect.resId
+                    snackbarNonce += 1
+                }
                 is DayUiEffect.OpenEditor -> onEditTask(effect.task)
             }
         }
+    }
+    val snackbarText = snackbarResId?.let { stringResource(it) }
+    LaunchedEffect(snackbarNonce) {
+        val text = snackbarText ?: return@LaunchedEffect
+        if (snackbarNonce == 0) return@LaunchedEffect
+        snackbarHostState.showSnackbar(text)
     }
     DayScreen(
         state = state,
@@ -189,7 +203,7 @@ fun DayScreen(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     modifier: Modifier = Modifier,
 ) {
-    val showEmpty = !state.isLoading && state.tasks.isEmpty() && state.errorMessage == null
+    val showEmpty = !state.isLoading && state.tasks.isEmpty() && state.errorMessageRes == null
     val canvasMode = state.viewMode != ViewMode.LIST
     val nowMinute = state.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: 0
     val flowActive = state.pauseSlipOpen ||
@@ -276,9 +290,9 @@ fun DayScreen(
                 resetEnabled = state.hasUserRotation,
                 onResetRotation = onResetRotation,
             )
-            state.errorMessage?.let { message ->
+            state.errorMessageRes?.let { messageRes ->
                 Text(
-                    text = message,
+                    text = stringResource(messageRes),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(16.dp),
                 )
