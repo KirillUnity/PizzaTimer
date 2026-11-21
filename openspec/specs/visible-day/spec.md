@@ -7,7 +7,7 @@ Choose which local date the day screen shows, and advance that date at midnight 
 ## Requirements
 
 ### Requirement: Open today follows the local date
-While the visible date is the local today, the day screen MUST replace that date with the new local date when the local calendar day changes. The screen MUST show tasks for the new date, MUST materialize recurrence for that visible date only, and MUST select the AM or PM half from the new local time. The sample day MUST NOT be inserted again because of this advance. Locked by `DayViewModelTest.midnight_followsOpenToday`.
+While the visible date is the local today, the day screen MUST replace that date with the new local date when the local calendar day changes. The screen MUST show tasks for the new date, MUST materialize recurrence for that visible date only, and MUST select the AM or PM half from the new local time. The sample day MUST NOT be inserted on first launch or because of this advance. Locked by `DayViewModelTest.midnight_followsOpenToday` and `SampleDaySeederTest.emptyStore_staysEmpty`.
 
 #### Scenario: Today at 23:59 then the next local date
 - **WHEN** the visible date is local today at 23:59 and the next clock tick is the next local date
@@ -34,3 +34,14 @@ This change MUST NOT close an open interval and MUST NOT append minutes after mi
 #### Scenario: Open block survives the date change
 - **WHEN** an interval is open as local today becomes the next date
 - **THEN** that interval stays open with the same start and gains no end minute from the date change
+
+### Requirement: Startup does not plant a sample day
+Loading the day MUST NOT insert Sleep, Deep work, Lunch, or Gym. If those fixture ids are already stored, they MUST be deleted on load. Other tasks MUST stay. `SampleDaySeederTest.emptyStore_staysEmpty` and `SampleDaySeederTest.fixtureIds_areRemoved` lock this.
+
+#### Scenario: Empty install
+- **WHEN** the task store is empty and the day screen loads
+- **THEN** no sample tasks are written
+
+#### Scenario: Leftover fixtures
+- **WHEN** the store still has the debug fixture ids
+- **THEN** those rows are deleted and other rows remain

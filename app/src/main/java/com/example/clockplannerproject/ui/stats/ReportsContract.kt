@@ -16,6 +16,9 @@ data class ReportsUiState(
     val editingTaskId: TaskId? = null,
     /** True while a manual collect is waiting on [com.example.clockplannerproject.kit.core.planner.PlannerSource.report]. */
     val isCollecting: Boolean = false,
+    /** Self-report rows for today. Empty day is zeros, not a warning. */
+    val dayStats: com.example.clockplannerproject.kit.core.DayStateStats =
+        com.example.clockplannerproject.kit.core.DayStateStats.Empty,
 ) : UiState
 
 sealed interface ReportsUiIntent : UiIntent {

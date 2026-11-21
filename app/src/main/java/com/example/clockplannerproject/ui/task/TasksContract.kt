@@ -1,5 +1,7 @@
 package com.example.clockplannerproject.ui.task
 
+import com.example.clockplannerproject.kit.core.BreakSession
+import com.example.clockplannerproject.kit.core.GoalBook
 import com.example.clockplannerproject.kit.core.Importance
 import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.ReportId
@@ -20,6 +22,34 @@ import com.example.clockplannerproject.kit.core.planner.PlanDraft
 import kotlinx.datetime.LocalDate
 import java.util.UUID
 
+/**
+ * Where a new-task sheet is in the create flow. Null means the accordion editor (edit).
+ *
+ * @since 1.3.0
+ */
+enum class CreateStage {
+    CHOOSER,
+    NAME,
+    WHEN,
+    LOOK,
+    DETAILS,
+}
+
+/**
+ * Collapsed rows on the existing-task editor.
+ *
+ * @since 1.3.0
+ */
+enum class EditSection {
+    NAME,
+    WHEN,
+    LOOK,
+    DETAILS,
+    GOALS,
+    REPORTS,
+    ACTIONS,
+}
+
 data class TaskEditorState(
     val id: TaskId? = null,
     val title: String = "",
@@ -35,6 +65,13 @@ data class TaskEditorState(
     val error: TaskDraftError? = null,
     val recurrence: RecurrenceRule = RecurrenceRule.None,
     val seriesId: String? = null,
+    /**
+     * Date whose intervals are open in the editor.
+     * Null for a Daily or Weekdays template until the user picks a day.
+     */
+    val intervalDate: LocalDate? = null,
+    val createStage: CreateStage? = null,
+    val expandedEditSections: Set<EditSection> = emptySet(),
 ) {
     val isNew: Boolean get() = id == null
 
@@ -68,7 +105,9 @@ data class TaskEditorState(
             title = task.title,
             description = task.description,
             colorArgb = task.colorArgb,
-            blocks = task.blocks,
+            blocks = task.blocks.map { block ->
+                if (block.id.isNotBlank()) block else block.copy(id = UUID.randomUUID().toString())
+            },
             status = task.status,
             importance = task.importance,
             project = task.normalizedProject.orEmpty(),
@@ -76,6 +115,7 @@ data class TaskEditorState(
             scheduledDate = task.date,
             recurrence = task.recurrence,
             seriesId = task.seriesId,
+            intervalDate = if (task.recurrence is RecurrenceRule.None) task.date else null,
         )
     }
 }
@@ -91,7 +131,10 @@ data class TasksUiState(
     val editor: TaskEditorState? = null,
     val timePicker: TimePickerTarget? = null,
     val showDatePicker: Boolean = false,
+    val showIntervalDatePicker: Boolean = false,
     val pendingDelete: Task? = null,
+    val selectedTaskIds: Set<TaskId> = emptySet(),
+    val pendingBulkDelete: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessageRes: Int? = null,
     val selectedProject: String? = null,
@@ -100,12 +143,15 @@ data class TasksUiState(
     val nowMinute: Int = 0,
     val pendingMove: Task? = null,
     val reports: List<TaskReport> = emptyList(),
+    /** Interval whose notes and goal are open in the editor. */
+    val commentBlockId: String? = null,
     val reportDraft: String = "",
     val editingReportId: ReportId? = null,
     val planSheet: PlanSheetUi? = null,
     val planDeadlinePicker: Boolean = false,
     val planStepDateIndex: Int? = null,
     val planWindowEdge: PlanWindowEdge? = null,
+    val goals: GoalBook = GoalBook(),
 ) : UiState {
     val visibleTasks: List<Task>
         get() {
@@ -113,6 +159,7 @@ data class TasksUiState(
             val tag = selectedTag
             val query = projectSearch.trim()
             return tasks.asSequence()
+                .filterNot(BreakSession::isBreak)
                 .filter { task ->
                     selected == null || task.normalizedProject.equals(selected, ignoreCase = true)
                 }
@@ -150,7 +197,8 @@ data class TasksUiState(
     val availableTags: List<String>
         get() {
             val query = projectSearch.trim()
-            return tasks.flatMap(Task::normalizedTags)
+            return tasks.filterNot(BreakSession::isBreak)
+                .flatMap(Task::normalizedTags)
                 .distinctBy { it.lowercase() }
                 .filter { query.isEmpty() || it.contains(query, ignoreCase = true) }
                 .sortedWith(String.CASE_INSENSITIVE_ORDER)
@@ -160,11 +208,22 @@ data class TasksUiState(
 sealed interface TasksUiIntent : UiIntent {
     data object Create : TasksUiIntent
     data object CreateForSelectedDay : TasksUiIntent
+    /** Saves an untimed task on the selected day. [fallbackTitle] is used when the name is blank. */
+    data class CreateTodayQuick(val fallbackTitle: String) : TasksUiIntent
+    data object StartCreateWizard : TasksUiIntent
+    data object CreateNextStage : TasksUiIntent
+    data object CreateSkipStage : TasksUiIntent
+    data object CreateBackStage : TasksUiIntent
+    data class CreateFinishWizard(val fallbackTitle: String) : TasksUiIntent
     data class Edit(val task: Task) : TasksUiIntent
     data object Update : TasksUiIntent
     data class Delete(val task: Task) : TasksUiIntent
+    data class ToggleTaskSelection(val taskId: TaskId) : TasksUiIntent
+    data object ClearTaskSelection : TasksUiIntent
+    data object RequestDeleteSelected : TasksUiIntent
     data object ConfirmDelete : TasksUiIntent
     data object DismissEditor : TasksUiIntent
+    data class ToggleEditSection(val section: EditSection) : TasksUiIntent
     data object DismissDelete : TasksUiIntent
     data object PreviousDay : TasksUiIntent
     data object NextDay : TasksUiIntent
@@ -176,6 +235,7 @@ sealed interface TasksUiIntent : UiIntent {
     data class ChangeColor(val colorArgb: Long) : TasksUiIntent
     data class ChangeBlockStart(val index: Int, val minute: Int) : TasksUiIntent
     data class ChangeBlockEnd(val index: Int, val minute: Int) : TasksUiIntent
+    data class ChangePlannedMinutes(val index: Int, val minutes: Int) : TasksUiIntent
     data object AddBlock : TasksUiIntent
     data class RemoveBlock(val index: Int) : TasksUiIntent
     data object ClearTime : TasksUiIntent
@@ -199,6 +259,9 @@ sealed interface TasksUiIntent : UiIntent {
     data object DismissMove : TasksUiIntent
     data class ConfirmMove(val date: LocalDate) : TasksUiIntent
     data class ChangeRecurrence(val rule: RecurrenceRule) : TasksUiIntent
+    data object OpenIntervalDatePicker : TasksUiIntent
+    data object DismissIntervalDatePicker : TasksUiIntent
+    data class SelectIntervalDate(val date: LocalDate) : TasksUiIntent
     data class ChangeReportDraft(val text: String) : TasksUiIntent
     data class EditReport(val report: TaskReport) : TasksUiIntent
     data object SaveReport : TasksUiIntent
@@ -223,6 +286,15 @@ sealed interface TasksUiIntent : UiIntent {
     data object DismissPlanStepDate : TasksUiIntent
     data class MovePlanStep(val index: Int, val date: LocalDate) : TasksUiIntent
     data object AcceptPlan : TasksUiIntent
+
+    /** Links the open task to an intermediate goal, or clears it when null. */
+    data class LinkIntermediate(val goalId: String?) : TasksUiIntent
+
+    /** Links one interval of the open task to an intermediate goal. */
+    data class LinkInterval(val blockId: String, val goalId: String?) : TasksUiIntent
+
+    /** Shows notes for one interval. */
+    data class SelectCommentInterval(val blockId: String) : TasksUiIntent
 }
 
 /**

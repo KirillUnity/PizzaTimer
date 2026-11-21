@@ -40,10 +40,10 @@ class TaskTimerTest {
     fun pause_closesOpenBlock_pastUnchanged() {
         val started = TaskTimer.start(sport, 12 * 60)
         val paused = TaskTimer.pause(started, 13 * 60)
-        assertEquals(
-            listOf(TimeBlock(8 * 60, 9 * 60), TimeBlock(12 * 60, 13 * 60)),
-            paused.blocks,
-        )
+        assertEquals(TimeBlock(8 * 60, 9 * 60), paused.blocks.first())
+        assertEquals(12 * 60, paused.blocks.last().startMinute)
+        assertEquals(13 * 60, paused.blocks.last().endMinute)
+        assertTrue(paused.blocks.last().id.isNotBlank())
         assertEquals(TimeBlock(8 * 60, 9 * 60), paused.blocks.first())
         assertFalse(TaskTimer.hasOpenBlock(paused))
         assertEquals(TaskStatus.TODO, paused.status)

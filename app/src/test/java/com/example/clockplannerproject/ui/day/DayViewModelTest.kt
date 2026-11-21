@@ -1,9 +1,20 @@
 package com.example.clockplannerproject.ui.day
 
+import com.example.clockplannerproject.data.InMemoryAppearanceRepository
 import com.example.clockplannerproject.data.InMemoryFlowMemoryStore
 import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
 import com.example.clockplannerproject.data.SampleDaySeeder
 import com.example.clockplannerproject.data.SampleSeedFlagStore
+import com.example.clockplannerproject.kit.core.Appearance
+import com.example.clockplannerproject.kit.core.AppearancePalette
+import com.example.clockplannerproject.data.InMemoryGoalBookStore
+import com.example.clockplannerproject.data.InMemoryReportRepository
+import com.example.clockplannerproject.kit.core.GoalBook
+import com.example.clockplannerproject.kit.core.BreakSession
+import com.example.clockplannerproject.kit.core.DemandMark
+import com.example.clockplannerproject.kit.core.TaskCompletion
+import com.example.clockplannerproject.kit.core.TaskCompletionCodec
+import com.example.clockplannerproject.kit.core.TaskReport
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.FlowMemoryStore
 import com.example.clockplannerproject.kit.core.RecurrenceRule
@@ -14,6 +25,8 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.ViewMode
+import com.example.clockplannerproject.kit.core.config.BackgroundConfig
+import com.example.clockplannerproject.kit.core.config.BackgroundPresets
 import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
 import com.example.clockplannerproject.kit.core.practice.PracticeSkill
 import com.example.clockplannerproject.kit.core.PauseMood
@@ -34,6 +47,8 @@ import kotlinx.datetime.LocalTime
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -182,6 +197,32 @@ class DayViewModelTest {
     }
 
     @Test
+    fun setLook_persistsTheSameAppearanceSettingsReads() = runTest {
+        val appearance = InMemoryAppearanceRepository(
+            Appearance.Default.copy(darkTheme = true),
+        )
+        val viewModel = dayViewModel(listOf(work), appearance = appearance)
+        val next = Appearance(
+            viewMode = ViewMode.LIST,
+            accentArgb = AppearancePalette.ACCENT_EMERALD,
+            completedArgb = AppearancePalette.COMPLETED_COOL,
+            background = BackgroundConfig.Preset(BackgroundPresets.PARCHMENT),
+        )
+        viewModel.onIntent(DayUiIntent.SetLook(next))
+        assertEquals(ViewMode.LIST, viewModel.state.value.viewMode)
+        assertEquals(AppearancePalette.ACCENT_EMERALD, viewModel.state.value.accentArgb)
+        assertEquals(BackgroundPresets.PARCHMENT, (viewModel.state.value.background as BackgroundConfig.Preset).name)
+        val stored = appearance.observeAppearance().first()
+        assertEquals(ViewMode.LIST, stored.viewMode)
+        assertEquals(AppearancePalette.ACCENT_EMERALD, stored.accentArgb)
+        assertEquals(AppearancePalette.COMPLETED_COOL, stored.completedArgb)
+        assertEquals(BackgroundPresets.PARCHMENT, (stored.background as BackgroundConfig.Preset).name)
+        assertTrue(stored.darkTheme)
+        viewModel.onIntent(DayUiIntent.ToggleHideCompleted)
+        assertTrue(viewModel.state.value.hideCompleted)
+    }
+
+    @Test
     fun setViewMode_survivesTaskEmission() {
         val viewModel = dayViewModel(listOf(work))
         viewModel.onIntent(DayUiIntent.SetViewMode(ViewMode.PIZZA))
@@ -196,6 +237,87 @@ class DayViewModelTest {
         viewModel.onIntent(DayUiIntent.SelectTask(work))
         viewModel.onIntent(DayUiIntent.SelectTask(work))
         assertNull(viewModel.state.value.selectedTask)
+        assertEquals(false, viewModel.state.value.detailsOpen)
+    }
+
+    @Test
+    fun pause_tapSelectedWork_clearsSelection() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        val pausedWork = later.state.value.tasks.single { it.id == work.id }
+        assertEquals(pausedWork.id, later.state.value.selectedTask?.id)
+        later.onIntent(DayUiIntent.SelectTask(pausedWork))
+        assertNull(later.state.value.selectedTask)
+        assertNotNull(BreakSession.openBreak(later.state.value.tasks))
+    }
+
+    @Test
+    fun openTaskDetails_secondTapClears() {
+        val viewModel = dayViewModel(listOf(work))
+        viewModel.onIntent(DayUiIntent.OpenTaskDetails(work))
+        assertEquals(work.id, viewModel.state.value.sheetTask?.id)
+        viewModel.onIntent(DayUiIntent.OpenTaskDetails(work))
+        assertNull(viewModel.state.value.selectedTask)
+        assertNull(viewModel.state.value.sheetTask)
+    }
+
+    @Test
+    fun timedStart_closesOnEndMinuteOnce() = runTest {
+        val clock = FakeTimeProvider(date, LocalTime(9, 0))
+        val viewModel = dayViewModel(listOf(work), sharedClock = clock)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartFor(15))
+        val open = viewModel.state.value.tasks.single()
+        assertEquals(2, open.blocks.size)
+        assertNull(open.blocks.last().endMinute)
+        assertEquals(15, viewModel.state.value.sessionMinutesLeft)
+        val effects = mutableListOf<DayUiEffect>()
+        val job = launch(dispatcher) { viewModel.effect.collect { effects.add(it) } }
+        clock.set(date, LocalTime(9, 15))
+        val closed = viewModel.state.value.tasks.single()
+        assertEquals(TimeBlock(9 * 60, 12 * 60), closed.blocks.first())
+        assertEquals(9 * 60, closed.blocks.last().startMinute)
+        assertEquals(9 * 60 + 15, closed.blocks.last().endMinute)
+        assertEquals(2, closed.blocks.size)
+        clock.set(date, LocalTime(9, 20))
+        assertEquals(closed.blocks, viewModel.state.value.tasks.single().blocks)
+        assertEquals(1, effects.count { it == DayUiEffect.PlayChime })
+        job.cancel()
+    }
+
+    @Test
+    fun playWithoutSelection_createsOneOpenInterval_secondPlayDoesNotAppend() {
+        val viewModel = dayViewModel(emptyList(), LocalTime(9, 30))
+        val before = viewModel.state.value.tasks
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val tasks = viewModel.state.value.tasks
+        assertEquals(before.size + 1, tasks.size)
+        val created = tasks.single { it.title.isEmpty() }
+        assertEquals(1, created.blocks.size)
+        assertEquals(9 * 60 + 30, created.blocks.single().startMinute)
+        assertNull(created.blocks.single().endMinute)
+        assertEquals(created.id, viewModel.state.value.selectedTask?.id)
+        before.forEach { previous ->
+            assertEquals(previous.blocks, tasks.single { it.id == previous.id }.blocks)
+        }
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val again = viewModel.state.value.tasks
+        assertEquals(tasks.size, again.size)
+        assertEquals(1, again.single { it.id == created.id }.blocks.size)
+
+        val open = work.copy(
+            blocks = listOf(TimeBlock(8 * 60, null)),
+            status = TaskStatus.IN_PROGRESS,
+        )
+        val running = dayViewModel(listOf(open), LocalTime(9, 30))
+        running.onIntent(DayUiIntent.StartTimer)
+        assertEquals(1, running.state.value.tasks.size)
+        assertEquals(listOf(TimeBlock(8 * 60, null)), running.state.value.tasks.single().blocks)
     }
 
     @Test
@@ -210,9 +332,270 @@ class DayViewModelTest {
         val later = dayViewModel(listOf(started), LocalTime(13, 0))
         later.onIntent(DayUiIntent.SelectTask(started))
         later.onIntent(DayUiIntent.PauseTimer)
-        val paused = later.state.value.tasks.single()
+        val paused = later.state.value.tasks.first { it.id == work.id }
         assertEquals(TimeBlock(9 * 60, 12 * 60), paused.blocks.first())
-        assertEquals(TimeBlock(12 * 60, 13 * 60), paused.blocks.last())
+        assertEquals(12 * 60, paused.blocks.last().startMinute)
+        assertEquals(13 * 60, paused.blocks.last().endMinute)
+        assertTrue(BreakSession.isBreak(later.state.value.tasks.first { it.id != work.id }))
+        assertFalse(later.state.value.pauseSlipOpen)
+    }
+
+    @Test
+    fun pause_startsBreak_andLeavesClosedBlocks() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        assertFalse(later.state.value.pauseSlipOpen)
+        val paused = later.state.value.tasks.single { it.id == work.id }
+        assertEquals(TimeBlock(9 * 60, 12 * 60), paused.blocks.first())
+        assertEquals(12 * 60, paused.blocks.last().startMinute)
+        assertEquals(13 * 60, paused.blocks.last().endMinute)
+        val breakTask = later.state.value.tasks.single { BreakSession.isBreak(it) }
+        assertEquals(13 * 60, breakTask.blocks.single().startMinute)
+        assertNull(breakTask.blocks.single().endMinute)
+        assertEquals(work.id, later.state.value.selectedTask?.id)
+        later.onIntent(DayUiIntent.FinishBreak)
+        assertFalse(later.state.value.pauseSlipOpen)
+        assertNull(BreakSession.openBreak(later.state.value.tasks))
+        val afterFinish = later.state.value.tasks.single { it.id == work.id }
+        assertEquals(paused.blocks, afterFinish.blocks)
+    }
+
+    @Test
+    fun pause_whileBreakOpen_keepsWorkSelected() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        val breakTask = later.state.value.tasks.single { BreakSession.isBreak(it) }
+        val pausedWork = later.state.value.tasks.single { it.id == work.id }
+        assertEquals(pausedWork.id, later.state.value.selectedTask?.id)
+        later.onIntent(DayUiIntent.PauseTimer)
+        assertEquals(pausedWork.id, later.state.value.selectedTask?.id)
+        assertEquals(pausedWork.blocks, later.state.value.tasks.single { it.id == work.id }.blocks)
+        assertEquals(breakTask.blocks, later.state.value.tasks.single { BreakSession.isBreak(it) }.blocks)
+        assertNotNull(BreakSession.openBreak(later.state.value.tasks))
+    }
+
+    @Test
+    fun continue_appendsOneWorkInterval_playDoesNotDouble() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        val closed = later.state.value.tasks.single { it.id == work.id }.blocks
+        later.onIntent(DayUiIntent.ContinueBreak)
+        val continued = later.state.value.tasks.single { it.id == work.id }
+        assertEquals(closed, continued.blocks.dropLast(1))
+        assertNull(continued.blocks.last().endMinute)
+        assertEquals(13 * 60, continued.blocks.last().startMinute)
+        assertNull(BreakSession.openBreak(later.state.value.tasks))
+        later.onIntent(DayUiIntent.StartTimer)
+        assertEquals(continued.blocks, later.state.value.tasks.single { it.id == work.id }.blocks)
+    }
+
+    @Test
+    fun completion_emptySave_storesDefaults_andReloadEdits() {
+        val reports = InMemoryReportRepository()
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0), reports = reports)
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        later.onIntent(DayUiIntent.FinishBreak)
+        assertTrue(later.state.value.completion.open)
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        assertFalse(later.state.value.completion.open)
+        val stored = TaskCompletionCodec.decode(reports.snapshot().single().text)
+        assertEquals(TaskCompletion.DEFAULT_PROXY, stored?.stateAfter)
+        assertEquals(TaskCompletion.DEFAULT_PROXY, stored?.engagement)
+        assertEquals(TaskCompletion.DEFAULT_PROXY, stored?.skill)
+        assertEquals(DemandMark.CHALLENGE, stored?.mark)
+
+        later.onIntent(DayUiIntent.SelectTask(later.state.value.tasks.single { it.id == work.id }))
+        later.onIntent(DayUiIntent.OpenCompletion)
+        assertTrue(later.state.value.completion.open)
+        assertEquals(TaskCompletion.DEFAULT_PROXY, later.state.value.completion.stateAfter)
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(stateAfter = 8, engagement = 3),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        val edited = TaskCompletionCodec.decode(reports.snapshot().single().text)
+        assertEquals(8, edited?.stateAfter)
+        assertEquals(3, edited?.engagement)
+        assertEquals(1, reports.snapshot().size)
+    }
+
+    @Test
+    fun completion_scoresEachInterval_andLeavesTaskOpen() {
+        val reports = InMemoryReportRepository()
+        val viewModel = dayViewModel(listOf(work), LocalTime(9, 0), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val paused = dayViewModel(listOf(started), LocalTime(10, 0), reports = reports)
+        paused.onIntent(DayUiIntent.SelectTask(started))
+        paused.onIntent(DayUiIntent.PauseTimer)
+        paused.onIntent(DayUiIntent.ContinueBreak)
+        val continued = paused.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(continued), LocalTime(11, 0), reports = reports)
+        later.onIntent(DayUiIntent.SelectTask(continued))
+        later.onIntent(DayUiIntent.PauseTimer)
+        later.onIntent(DayUiIntent.FinishBreak)
+        val secondId = later.state.value.completion.blockId
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(
+                    stateAfter = 9,
+                    engagement = 9,
+                    skill = 9,
+                    mark = DemandMark.CHALLENGE,
+                    done = true,
+                ),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        assertEquals(TaskStatus.TODO, later.state.value.tasks.single { it.id == work.id }.status)
+        later.onIntent(DayUiIntent.SelectTask(later.state.value.tasks.single { it.id == work.id }))
+        later.onIntent(DayUiIntent.OpenIntervalCompletion(0))
+        val firstId = later.state.value.completion.blockId
+        assertNotEquals(secondId, firstId)
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(
+                    stateAfter = 2,
+                    engagement = 2,
+                    skill = 2,
+                    mark = DemandMark.HINDRANCE,
+                ),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        assertEquals(2, reports.snapshot().size)
+        val scores = reports.snapshot().associate { report ->
+            report.id.value to TaskCompletionCodec.decode(report.text)?.stateAfter
+        }
+        assertEquals(9, scores[TaskCompletionCodec.reportId(work.id, secondId!!).value])
+        assertEquals(2, scores[TaskCompletionCodec.reportId(work.id, firstId!!).value])
+        assertEquals(TaskStatus.TODO, later.state.value.tasks.single { it.id == work.id }.status)
+    }
+
+    @Test
+    fun completion_save_clearsSelection() {
+        val reports = InMemoryReportRepository()
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0), reports = reports)
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        later.onIntent(DayUiIntent.FinishBreak)
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(
+                    engagement = 5,
+                    skill = 6,
+                    stateAfter = 7,
+                    mark = DemandMark.CHALLENGE,
+                    done = true,
+                ),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        assertFalse(later.state.value.completion.open)
+        assertNull(later.state.value.selectedTask)
+        assertFalse(later.state.value.detailsOpen)
+    }
+
+    @Test
+    fun completion_namesTask_andAddsNextWithoutOpenInterval() {
+        val reports = InMemoryReportRepository()
+        val untitled = work.copy(title = "")
+        val viewModel = dayViewModel(listOf(untitled), LocalTime(12, 0), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(untitled))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == untitled.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0), reports = reports)
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        val closed = later.state.value.tasks.single { it.id == untitled.id }.blocks
+        later.onIntent(DayUiIntent.FinishBreak)
+        assertTrue(later.state.value.completion.titleEditable)
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(
+                    title = "Черновик",
+                    nextTitle = "Следующее",
+                    engagement = 4,
+                    skill = 7,
+                    stateAfter = 6,
+                    mark = DemandMark.HINDRANCE,
+                    easier = "короче",
+                    progress = "ещё абзац",
+                ),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        assertFalse(later.state.value.completion.open)
+        assertNull(later.state.value.selectedTask)
+        val saved = later.state.value.tasks.single { it.id == untitled.id }
+        assertEquals("Черновик", saved.title)
+        assertEquals(closed, saved.blocks)
+        val next = later.state.value.tasks.single { it.title == "Следующее" }
+        assertTrue(next.blocks.isEmpty())
+        val stored = TaskCompletionCodec.decode(reports.snapshot().single().text)
+        assertEquals(DemandMark.HINDRANCE, stored?.mark)
+        assertEquals(6, stored?.stateAfter)
+        assertFalse(stored?.done ?: true)
+    }
+
+    @Test
+    fun completion_nextTaskInheritsIntermediate() {
+        val untitled = work.copy(title = "Черновик")
+        val goals = InMemoryGoalBookStore(
+            GoalBook()
+                .withMain("Книга")
+                .addIntermediate("Глава", id = "g1")
+                .link(untitled.id.value, "g1"),
+        )
+        val viewModel = dayViewModel(listOf(untitled), LocalTime(12, 0), goals = goals)
+        viewModel.onIntent(DayUiIntent.SelectTask(untitled))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == untitled.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0), goals = goals)
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        later.onIntent(DayUiIntent.FinishBreak)
+        later.onIntent(
+            DayUiIntent.EditCompletion(
+                later.state.value.completion.copy(
+                    nextTitle = "Следующее",
+                    engagement = 4,
+                    skill = 7,
+                    stateAfter = 6,
+                    mark = DemandMark.CHALLENGE,
+                ),
+            ),
+        )
+        later.onIntent(DayUiIntent.SubmitCompletion)
+        val next = later.state.value.tasks.single { it.title == "Следующее" }
+        assertEquals("g1", goals.snapshot().taskLinks[next.id.value])
+        assertEquals("g1", goals.snapshot().taskLinks[untitled.id.value])
     }
 
     @Test
@@ -224,14 +607,13 @@ class DayViewModelTest {
         val later = dayViewModel(listOf(started), LocalTime(13, 0))
         later.onIntent(DayUiIntent.SelectTask(started))
         later.onIntent(DayUiIntent.PauseTimer)
-        assertTrue(later.state.value.pauseSlipOpen)
-        val paused = later.state.value.tasks.single()
+        assertFalse(later.state.value.pauseSlipOpen)
+        val paused = later.state.value.tasks.single { it.id == work.id }
         later.onIntent(DayUiIntent.ChangePauseDraft("цифры за четверг"))
         later.onIntent(DayUiIntent.SelectPauseMood(PauseMood.Deep))
         later.onIntent(DayUiIntent.CommitPause)
         assertFalse(later.state.value.pauseSlipOpen)
-        assertEquals("цифры за четверг", later.state.value.resumeCheckpoint)
-        assertEquals(paused.blocks, later.state.value.tasks.single().blocks)
+        assertEquals(paused.blocks, later.state.value.tasks.single { it.id == work.id }.blocks)
     }
 
     @Test
@@ -278,11 +660,13 @@ class DayViewModelTest {
             sampleDaySeeder = SampleDaySeeder(openRepo, openClock, MemorySampleSeedFlag()),
         )
         assertEquals(today, openDay.state.value.date)
+        assertEquals(today, openDay.state.value.localToday)
         assertEquals(DialHalf.PM, openDay.state.value.dialHalf)
 
         openClock.set(next, LocalTime(0, 0))
 
         assertEquals(next, openDay.state.value.date)
+        assertEquals(next, openDay.state.value.localToday)
         assertEquals(DialHalf.AM, openDay.state.value.dialHalf)
         val stored = openRepo.snapshot().single { it.id == open.id }
         assertEquals(today, stored.date)
@@ -314,9 +698,11 @@ class DayViewModelTest {
         )
         held.onIntent(DayUiIntent.PreviousDay)
         assertEquals(yesterday, held.state.value.date)
+        assertEquals(today, held.state.value.localToday)
         val halfWhileAway = held.state.value.dialHalf
         heldClock.set(next, LocalTime(0, 0))
         assertEquals(yesterday, held.state.value.date)
+        assertEquals(next, held.state.value.localToday)
         assertEquals(halfWhileAway, held.state.value.dialHalf)
 
         held.onIntent(DayUiIntent.SelectDate(next))
@@ -379,7 +765,10 @@ class DayViewModelTest {
         reloaded.onIntent(DayUiIntent.PauseTimer)
         reloaded.onIntent(DayUiIntent.ChangePauseDraft("чужое"))
         reloaded.onIntent(DayUiIntent.SkipPause)
-        reloaded.onIntent(DayUiIntent.SelectTask(reloaded.state.value.tasks.first { it.id == work.id }))
+        val workAfterSkip = reloaded.state.value.tasks.first { it.id == work.id }
+        if (reloaded.state.value.selectedTask?.id != work.id) {
+            reloaded.onIntent(DayUiIntent.SelectTask(workAfterSkip))
+        }
         assertEquals("цифры за четверг", reloaded.state.value.resumeCheckpoint)
         assertEquals(PauseMood.Deep, reloaded.state.value.resumeMood)
 
@@ -472,6 +861,36 @@ class DayViewModelTest {
     }
 
     @Test
+    fun deleteWorkWhilePaused_removesBreak() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        val started = viewModel.state.value.tasks.single { it.id == work.id }
+        val later = dayViewModel(listOf(started), LocalTime(13, 0))
+        later.onIntent(DayUiIntent.SelectTask(started))
+        later.onIntent(DayUiIntent.PauseTimer)
+        assertNotNull(BreakSession.openBreak(later.state.value.tasks))
+        later.onIntent(DayUiIntent.RequestDelete)
+        later.onIntent(DayUiIntent.ConfirmDelete)
+        assertTrue(later.state.value.tasks.none { BreakSession.isBreak(it) })
+        assertNull(BreakSession.openBreak(later.state.value.tasks))
+        assertTrue(later.state.value.tasks.none { it.id == work.id })
+        assertNull(later.state.value.selectedTask)
+    }
+
+    @Test
+    fun deleteWorkWhilePlaying_leavesNoOpenInterval() {
+        val viewModel = dayViewModel(listOf(work), LocalTime(12, 0))
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.StartTimer)
+        viewModel.onIntent(DayUiIntent.RequestDelete)
+        viewModel.onIntent(DayUiIntent.ConfirmDelete)
+        assertTrue(viewModel.state.value.tasks.isEmpty())
+        assertNull(BreakSession.openBreak(viewModel.state.value.tasks))
+        assertNull(viewModel.state.value.selectedTask)
+    }
+
+    @Test
     fun confirmDelete_removesTaskAndSheet() {
         val viewModel = dayViewModel(listOf(work))
         viewModel.onIntent(DayUiIntent.SelectTask(work))
@@ -480,6 +899,69 @@ class DayViewModelTest {
         assertEquals(true, viewModel.state.value.tasks.isEmpty())
         assertNull(viewModel.state.value.selectedTask)
         assertNull(viewModel.state.value.pendingDelete)
+    }
+
+    @Test
+    fun leaveDelete_keepsTaskAndScores() {
+        val reports = InMemoryReportRepository(listOf(score(work.id)))
+        val viewModel = dayViewModel(listOf(work), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(work))
+        viewModel.onIntent(DayUiIntent.RequestDelete)
+        viewModel.onIntent(DayUiIntent.DismissDelete)
+        assertEquals(work.blocks, viewModel.state.value.tasks.single().blocks)
+        assertEquals(1, reports.snapshot().size)
+        assertNull(viewModel.state.value.pendingDelete)
+    }
+
+    @Test
+    fun confirmDelete_removesTaskIntervalsAndScores() {
+        val scored = work.copy(
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60), TimeBlock(11 * 60, 12 * 60)),
+        )
+        val neighbor = work.copy(
+            id = TaskId("neighbor"),
+            title = "Neighbor",
+            blocks = listOf(TimeBlock(14 * 60, 15 * 60)),
+        )
+        val reports = InMemoryReportRepository(listOf(score(scored.id)))
+        val viewModel = dayViewModel(listOf(scored, neighbor), reports = reports)
+        viewModel.onIntent(DayUiIntent.SelectTask(scored))
+        viewModel.onIntent(DayUiIntent.RequestDelete)
+        viewModel.onIntent(DayUiIntent.ConfirmDelete)
+        assertEquals(listOf(neighbor.id), viewModel.state.value.tasks.map { it.id })
+        assertEquals(neighbor.blocks, viewModel.state.value.tasks.single().blocks)
+        assertTrue(reports.snapshot().isEmpty())
+    }
+
+    @Test
+    fun renameTemplate_updatesSubtaskTitleOnDay_keepsInterval() = runTest {
+        val template = Task(
+            id = TaskId("daily"),
+            title = "Standup",
+            colorArgb = 0xFF6750A4,
+            blocks = listOf(TimeBlock(9 * 60, 9 * 60 + 15)),
+            date = LocalDate(2026, 10, 5),
+            recurrence = RecurrenceRule.Daily,
+            seriesId = "daily",
+        )
+        val interval = TimeBlock(14 * 60, 15 * 60)
+        val subtask = Task(
+            id = TaskId("tue"),
+            title = "Old",
+            colorArgb = 1,
+            blocks = listOf(interval),
+            date = date,
+            seriesId = "daily",
+        )
+        val repository = FakeTaskRepository(listOf(template, subtask))
+        val viewModel = dayViewModel(emptyList(), repository = repository)
+        val shown = viewModel.state.value.tasks.single { it.id == subtask.id }
+        assertEquals("Standup", shown.title)
+        assertEquals(listOf(interval), shown.blocks)
+        repository.upsert(template.copy(title = "Renamed"))
+        val renamed = viewModel.state.value.tasks.single { it.id == subtask.id }
+        assertEquals("Renamed", renamed.title)
+        assertEquals(listOf(interval), renamed.blocks)
     }
 
     @Test
@@ -516,15 +998,42 @@ class DayViewModelTest {
         flowMemory: FlowMemoryStore = InMemoryFlowMemoryStore(),
         repository: FakeTaskRepository? = null,
         practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
+        appearance: InMemoryAppearanceRepository = InMemoryAppearanceRepository(),
+        sharedClock: FakeTimeProvider? = null,
+        reports: InMemoryReportRepository = InMemoryReportRepository(),
+        goals: InMemoryGoalBookStore = InMemoryGoalBookStore(),
     ): DayViewModel {
-        val time = FakeTimeProvider(date, clock)
+        val time = sharedClock ?: FakeTimeProvider(date, clock)
         val tasks = repository ?: FakeTaskRepository(initial)
         return DayViewModel(
             taskRepository = tasks,
             timeProvider = time,
             sampleDaySeeder = SampleDaySeeder(tasks, time, MemorySampleSeedFlag()),
+            appearanceRepository = appearance,
             flowMemory = flowMemory,
             practice = practice,
+            reports = reports,
+            goals = goals,
+        )
+    }
+
+    private fun score(taskId: TaskId): TaskReport {
+        val completion = TaskCompletion(
+            stateAfter = 5,
+            engagement = 5,
+            skill = 5,
+            easier = "",
+            mark = DemandMark.CHALLENGE,
+            thoughts = "",
+            reframe = "",
+            done = true,
+            progress = "",
+        )
+        return TaskReport(
+            id = TaskCompletionCodec.reportId(taskId),
+            taskId = taskId,
+            createdAtEpochMillis = 0L,
+            text = TaskCompletionCodec.encode(completion),
         )
     }
 }

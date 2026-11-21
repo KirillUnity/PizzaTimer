@@ -8,11 +8,19 @@ import com.example.clockplannerproject.kit.core.TimeBlock
 import kotlinx.datetime.LocalDate
 
 /**
- * Typical-day fixtures for Previews and debug seeding. Not written in release builds.
+ * Typical-day fixtures for Previews and tests. Not written into the task store.
  *
  * @since 0.1.0
  */
 object SampleTasks {
+    /** Ids the old debug seeder used. Startup deletes any leftover rows. */
+    val fixtureIds: Set<TaskId> = setOf(
+        TaskId("sleep"),
+        TaskId("work"),
+        TaskId("lunch"),
+        TaskId("gym"),
+    )
+
     fun typicalDay(date: LocalDate): List<Task> = listOf(
         Task(
             id = TaskId("sleep"),

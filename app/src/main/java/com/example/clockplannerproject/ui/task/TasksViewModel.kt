@@ -3,6 +3,9 @@ package com.example.clockplannerproject.ui.task
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.data.InMemoryGoalBookStore
+import com.example.clockplannerproject.kit.core.BreakSession
+import com.example.clockplannerproject.kit.core.GoalBookStore
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
 import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.ReportAttachmentImporter
@@ -11,9 +14,13 @@ import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskPalette
 import com.example.clockplannerproject.kit.core.TaskReport
+import com.example.clockplannerproject.kit.core.TaskDraftError
 import com.example.clockplannerproject.kit.core.TaskDraftValidator
+import com.example.clockplannerproject.kit.core.TaskCompletionCodec
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskInstances
+import com.example.clockplannerproject.kit.core.placeOnDate
+import com.example.clockplannerproject.kit.core.showingTemplateFaces
 import com.example.clockplannerproject.kit.core.TaskRepository
 import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TaskTags
@@ -36,6 +43,7 @@ import com.example.clockplannerproject.kit.core.planner.RussianPlannerPhrases
 import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
 import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
 import com.example.clockplannerproject.kit.core.practice.PracticeSkill
+import com.example.clockplannerproject.kit.core.time.SessionDuration
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,6 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -70,6 +79,7 @@ class TasksViewModel(
     private val planStore: PlannerPlanStore = IdlePlanStore,
     private val phrases: PlannerPhrases = RussianPlannerPhrases,
     private val practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
+    private val goals: GoalBookStore = InMemoryGoalBookStore(),
 ) : ViewModel() {
 
     private val selectedDate = MutableStateFlow(timeProvider.today())
@@ -92,27 +102,69 @@ class TasksViewModel(
     init {
         observeSelectedDate()
         observeEditorReports()
+        viewModelScope.launch {
+            goals.observe().collect { book ->
+                _state.update { it.copy(goals = book) }
+            }
+        }
     }
 
     fun onIntent(intent: TasksUiIntent) {
         when (intent) {
             TasksUiIntent.Create -> openCreate()
             TasksUiIntent.CreateForSelectedDay -> openCreate(scheduled = true)
+            is TasksUiIntent.CreateTodayQuick -> saveQuickToday(intent.fallbackTitle)
+            TasksUiIntent.StartCreateWizard -> updateEditor {
+                it.copy(createStage = CreateStage.NAME, error = null)
+            }
+            TasksUiIntent.CreateNextStage,
+            TasksUiIntent.CreateSkipStage -> advanceCreateStage()
+            TasksUiIntent.CreateBackStage -> retreatCreateStage()
+            is TasksUiIntent.CreateFinishWizard -> save(fallbackTitle = intent.fallbackTitle)
             is TasksUiIntent.Edit -> {
                 editorTaskId.value = intent.task.id
+                val editor = TaskEditorState.from(intent.task)
                 _state.update {
                     it.copy(
-                        editor = TaskEditorState.from(intent.task),
+                        editor = editor,
                         timePicker = null,
                         nowMinute = minuteOfNow(),
                         reportDraft = "",
                         editingReportId = null,
+                        commentBlockId = editor.blocks.firstOrNull()?.id,
                     )
                 }
             }
-            TasksUiIntent.Update -> save()
+            TasksUiIntent.Update -> save(fallbackTitle = null)
             is TasksUiIntent.Delete -> _state.update { it.copy(pendingDelete = intent.task) }
+            is TasksUiIntent.ToggleTaskSelection -> _state.update { current ->
+                val id = intent.taskId
+                val next = if (id in current.selectedTaskIds) {
+                    current.selectedTaskIds - id
+                } else {
+                    current.selectedTaskIds + id
+                }
+                current.copy(selectedTaskIds = next, pendingBulkDelete = false)
+            }
+            TasksUiIntent.ClearTaskSelection -> _state.update {
+                it.copy(selectedTaskIds = emptySet(), pendingBulkDelete = false)
+            }
+            TasksUiIntent.RequestDeleteSelected -> _state.update { current ->
+                if (current.selectedTaskIds.isEmpty()) {
+                    current
+                } else {
+                    current.copy(pendingBulkDelete = true)
+                }
+            }
             TasksUiIntent.ConfirmDelete -> confirmDelete()
+            is TasksUiIntent.ToggleEditSection -> updateEditor { editor ->
+                val next = if (intent.section in editor.expandedEditSections) {
+                    editor.expandedEditSections - intent.section
+                } else {
+                    editor.expandedEditSections + intent.section
+                }
+                editor.copy(expandedEditSections = next)
+            }
             TasksUiIntent.DismissEditor -> {
                 editorTaskId.value = null
                 _state.update {
@@ -125,7 +177,9 @@ class TasksViewModel(
                     )
                 }
             }
-            TasksUiIntent.DismissDelete -> _state.update { it.copy(pendingDelete = null) }
+            TasksUiIntent.DismissDelete -> _state.update {
+                it.copy(pendingDelete = null, pendingBulkDelete = false)
+            }
             TasksUiIntent.PreviousDay -> shiftDate(-1)
             TasksUiIntent.NextDay -> shiftDate(1)
             TasksUiIntent.OpenDatePicker -> _state.update { it.copy(showDatePicker = true) }
@@ -142,6 +196,9 @@ class TasksViewModel(
             is TasksUiIntent.ChangeBlockEnd -> updateBlock(intent.index) { block ->
                 val end = intent.minute.mod(TimeMath.MINUTES_PER_DAY)
                 block.copy(endMinute = if (end == 0 && block.startMinute != 0) TimeMath.MINUTES_PER_DAY else end)
+            }
+            is TasksUiIntent.ChangePlannedMinutes -> updateBlock(intent.index) { block ->
+                block.copy(plannedMinutes = intent.minutes.coerceIn(SessionDuration.MIN_MINUTES, SessionDuration.MAX_MINUTES))
             }
             TasksUiIntent.AddBlock -> addBlock()
             is TasksUiIntent.RemoveBlock -> removeBlock(intent.index)
@@ -199,7 +256,16 @@ class TasksViewModel(
             is TasksUiIntent.RequestMove -> _state.update { it.copy(pendingMove = intent.task) }
             TasksUiIntent.DismissMove -> _state.update { it.copy(pendingMove = null) }
             is TasksUiIntent.ConfirmMove -> confirmMove(intent.date)
-            is TasksUiIntent.ChangeRecurrence -> updateEditor { it.copy(recurrence = intent.rule) }
+            is TasksUiIntent.ChangeRecurrence -> updateEditor {
+                val dated = intent.rule !is RecurrenceRule.None
+                it.copy(
+                    recurrence = intent.rule,
+                    intervalDate = if (dated) null else it.scheduledDate,
+                )
+            }
+            TasksUiIntent.OpenIntervalDatePicker -> _state.update { it.copy(showIntervalDatePicker = true) }
+            TasksUiIntent.DismissIntervalDatePicker -> _state.update { it.copy(showIntervalDatePicker = false) }
+            is TasksUiIntent.SelectIntervalDate -> selectIntervalDate(intent.date)
             is TasksUiIntent.ChangeReportDraft -> _state.update { it.copy(reportDraft = intent.text) }
             is TasksUiIntent.EditReport -> _state.update {
                 it.copy(editingReportId = intent.report.id, reportDraft = intent.report.text)
@@ -235,6 +301,10 @@ class TasksViewModel(
                 _state.update { it.copy(planStepDateIndex = null) }
             is TasksUiIntent.MovePlanStep -> movePlanStep(intent.index, intent.date)
             TasksUiIntent.AcceptPlan -> acceptPlan()
+            is TasksUiIntent.LinkIntermediate -> linkIntermediate(intent.goalId)
+            is TasksUiIntent.LinkInterval -> linkInterval(intent.blockId, intent.goalId)
+            is TasksUiIntent.SelectCommentInterval ->
+                _state.update { it.copy(commentBlockId = intent.blockId) }
         }
     }
 
@@ -265,8 +335,23 @@ class TasksViewModel(
             editorTaskId.filterNotNull()
                 .flatMapLatest { id -> reportRepository.observeReports(id) }
                 .collect { reports ->
-                    _state.update { it.copy(reports = reports) }
+                    val notes = reports.filterNot { TaskCompletionCodec.isRecord(it.text) }
+                    _state.update { it.copy(reports = notes) }
                 }
+        }
+    }
+
+    private fun linkIntermediate(goalId: String?) {
+        val taskId = _state.value.editor?.id ?: return
+        viewModelScope.launch {
+            goals.save(_state.value.goals.link(taskId.value, goalId))
+        }
+    }
+
+    private fun linkInterval(blockId: String, goalId: String?) {
+        val taskId = _state.value.editor?.id ?: return
+        viewModelScope.launch {
+            goals.save(_state.value.goals.linkInterval(taskId.value, blockId, goalId))
         }
     }
 
@@ -284,6 +369,7 @@ class TasksViewModel(
             createdAtEpochMillis = created,
             text = text,
             attachment = existing?.attachment,
+            blockId = existing?.blockId ?: _state.value.commentBlockId,
         )
         viewModelScope.launch {
             try {
@@ -305,7 +391,9 @@ class TasksViewModel(
             try {
                 selectedDate.flatMapLatest { date ->
                     materializer.ensureVisibleDay(date)
-                    taskRepository.observeAll().map { tasks -> date to tasks }
+                    taskRepository.observeAll().map { tasks ->
+                        date to tasks.showingTemplateFaces()
+                    }
                 }
                     .collect { (date, tasks) ->
                         _state.update { current ->
@@ -338,25 +426,105 @@ class TasksViewModel(
         editorTaskId.value = null
         _state.update {
             it.copy(
-                editor = TaskEditorState(scheduledDate = if (scheduled) it.date else null),
+                editor = TaskEditorState(
+                    scheduledDate = if (scheduled) it.date else null,
+                    createStage = CreateStage.CHOOSER,
+                ),
                 timePicker = null,
                 nowMinute = minuteOfNow(),
             )
         }
     }
 
-    private fun save() {
+    private fun advanceCreateStage() {
+        updateEditor { editor ->
+            val next = when (editor.createStage) {
+                CreateStage.NAME -> CreateStage.WHEN
+                CreateStage.WHEN -> CreateStage.LOOK
+                CreateStage.LOOK -> CreateStage.DETAILS
+                else -> editor.createStage
+            }
+            editor.copy(createStage = next, error = null)
+        }
+    }
+
+    private fun retreatCreateStage() {
+        updateEditor { editor ->
+            val previous = when (editor.createStage) {
+                CreateStage.NAME -> CreateStage.CHOOSER
+                CreateStage.WHEN -> CreateStage.NAME
+                CreateStage.LOOK -> CreateStage.WHEN
+                CreateStage.DETAILS -> CreateStage.LOOK
+                else -> editor.createStage
+            }
+            editor.copy(createStage = previous, error = null)
+        }
+    }
+
+    private fun saveQuickToday(fallbackTitle: String) {
         val snapshot = _state.value
         val editor = snapshot.editor ?: return
-        val error = TaskDraftValidator.validate(title = editor.title, blocks = editor.blocks)
+        val date = snapshot.date ?: return
+        _state.update {
+            it.copy(
+                editor = editor.copy(
+                    title = editor.title.ifBlank { fallbackTitle },
+                    scheduledDate = date,
+                    createStage = editor.createStage,
+                ),
+            )
+        }
+        save(fallbackTitle = fallbackTitle)
+    }
+
+    private fun save(fallbackTitle: String?) {
+        val snapshot = _state.value
+        val raw = snapshot.editor ?: return
+        val editor = if (fallbackTitle != null && raw.title.isBlank()) {
+            raw.copy(title = fallbackTitle)
+        } else {
+            raw
+        }
+        val blockDate = editor.intervalDate ?: editor.scheduledDate
+        val blocksToValidate = if (
+            editor.recurrence !is RecurrenceRule.None && editor.intervalDate == null
+        ) {
+            emptyList()
+        } else {
+            editor.blocks
+        }
+        val occupying = snapshot.tasks
+            .filter { task ->
+                task.date == blockDate &&
+                    task.id != editor.id &&
+                    !BreakSession.isBreak(task)
+            }
+            .flatMap { it.blocks }
+        val error = TaskDraftValidator.validate(
+            title = editor.title,
+            blocks = blocksToValidate,
+            occupying = occupying,
+            nowMinute = snapshot.nowMinute,
+        )
         if (error != null) {
-            _state.update { it.copy(editor = editor.copy(error = error)) }
+            val section = when (error) {
+                TaskDraftError.EmptyTitle -> EditSection.NAME
+                TaskDraftError.EndEqualsStart,
+                TaskDraftError.OverlappingPeriod -> EditSection.WHEN
+            }
+            _state.update {
+                it.copy(
+                    editor = editor.copy(
+                        error = error,
+                        expandedEditSections = editor.expandedEditSections + section,
+                    ),
+                )
+            }
             return
         }
         viewModelScope.launch {
             try {
-                val saved = editor.toTask()
-                taskRepository.upsert(saved)
+                val saved = persistEditor(editor)
                 if (saved.isUntimed) {
                     practice.markTried(PracticeSkill.LEFTOVER)
                 }
@@ -372,15 +540,35 @@ class TasksViewModel(
     }
 
     private fun confirmDelete() {
-        val task = _state.value.pendingDelete ?: return
+        val snapshot = _state.value
+        val targets = buildList {
+            snapshot.pendingDelete?.let { add(it) }
+            if (snapshot.pendingBulkDelete) {
+                addAll(snapshot.tasks.filter { it.id in snapshot.selectedTaskIds })
+            }
+        }.distinctBy { it.id }
+        if (targets.isEmpty()) return
         viewModelScope.launch {
             try {
-                taskRepository.delete(task.id)
+                val gone = mutableSetOf<TaskId>()
+                for (task in targets) {
+                    val wedges = if (BreakSession.isBreak(task)) {
+                        emptyList()
+                    } else {
+                        BreakSession.wedgesFor(task.id, snapshot.tasks)
+                    }
+                    wedges.forEach { wedge -> taskRepository.delete(wedge.id) }
+                    taskRepository.delete(task.id)
+                    gone += task.id
+                    wedges.forEach { gone += it.id }
+                }
                 _state.update { current ->
                     current.copy(
                         pendingDelete = null,
-                        editor = current.editor?.takeUnless { it.id == task.id },
-                        timePicker = if (current.editor?.id == task.id) null else current.timePicker,
+                        pendingBulkDelete = false,
+                        selectedTaskIds = emptySet(),
+                        editor = current.editor?.takeUnless { it.id in gone },
+                        timePicker = if (current.editor?.id in gone) null else current.timePicker,
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -400,6 +588,8 @@ class TasksViewModel(
                 isLoading = true,
                 editor = null,
                 pendingDelete = null,
+                pendingBulkDelete = false,
+                selectedTaskIds = emptySet(),
                 pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
@@ -415,6 +605,8 @@ class TasksViewModel(
                 isLoading = true,
                 editor = null,
                 pendingDelete = null,
+                pendingBulkDelete = false,
+                selectedTaskIds = emptySet(),
                 pendingMove = null,
                 timePicker = null,
                 showDatePicker = false,
@@ -429,6 +621,25 @@ class TasksViewModel(
             TaskId(UUID.randomUUID().toString()),
             task.date,
         )
+        val occupying = _state.value.tasks
+            .filter { other ->
+                other.date == copy.date &&
+                    other.id != copy.id &&
+                    !BreakSession.isBreak(other)
+            }
+            .flatMap { it.blocks }
+        val overlap = TaskDraftValidator.validate(
+            title = copy.title.ifBlank { "copy" },
+            blocks = copy.blocks,
+            occupying = occupying,
+            nowMinute = minuteOfNow(),
+        )
+        if (overlap == TaskDraftError.OverlappingPeriod) {
+            viewModelScope.launch {
+                effects.send(TasksUiEffect.ShowMessageRes(R.string.task_error_overlap))
+            }
+            return
+        }
         viewModelScope.launch {
             try {
                 taskRepository.upsert(copy)
@@ -446,7 +657,9 @@ class TasksViewModel(
         val task = _state.value.pendingMove ?: return
         viewModelScope.launch {
             try {
-                taskRepository.upsert(TaskInstances.moved(task, date))
+                placeOnDate(taskRepository, task, date) {
+                    TaskId(UUID.randomUUID().toString())
+                }
                 _state.update { it.copy(pendingMove = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -458,32 +671,140 @@ class TasksViewModel(
         }
     }
 
+    private fun selectIntervalDate(date: LocalDate) {
+        val editor = _state.value.editor ?: return
+        viewModelScope.launch {
+            val previous = editor.intervalDate
+            if (previous != null && previous != date && editor.recurrence !is RecurrenceRule.None) {
+                writeIntervals(editor, previous, editor.blocks)
+            }
+            val blocks = loadIntervals(editor, date)
+            _state.update { current ->
+                val latest = current.editor ?: return@update current
+                current.copy(
+                    editor = latest.copy(intervalDate = date, blocks = blocks, error = null),
+                    showIntervalDatePicker = false,
+                )
+            }
+        }
+    }
+
+    /**
+     * Writes the open editor. A recurring template keeps its date; intervals go only to
+     * [TaskEditorState.intervalDate]. A subtask keeps its intervals and writes the face to the template.
+     */
+    private suspend fun persistEditor(editor: TaskEditorState): Task {
+        val subtask = editor.recurrence is RecurrenceRule.None && editor.seriesId != null
+        if (subtask) {
+            val template = taskRepository.listRecurringTemplates().firstOrNull { candidate ->
+                (candidate.seriesId ?: candidate.id.value) == editor.seriesId
+            }
+            if (template != null) {
+                taskRepository.upsert(
+                    template.copy(
+                        title = editor.title.trim(),
+                        description = editor.description.trim(),
+                        colorArgb = editor.colorArgb,
+                        importance = editor.importance,
+                        project = editor.project.trim().takeIf { it.isNotEmpty() },
+                        tags = TaskTags.normalize(editor.tags),
+                    ),
+                )
+            }
+            val saved = editor.toTask()
+            taskRepository.upsert(saved)
+            return saved
+        }
+        if (editor.recurrence !is RecurrenceRule.None && editor.id != null) {
+            val stored = taskRepository.get(editor.id)
+            val intervalDate = editor.intervalDate
+            if (intervalDate != null) {
+                writeIntervals(editor, intervalDate, editor.blocks)
+            }
+            val templateBlocks = if (intervalDate != null && intervalDate == editor.scheduledDate) {
+                editor.blocks
+            } else {
+                stored?.blocks ?: emptyList()
+            }
+            val saved = editor.toTask().copy(blocks = templateBlocks)
+            taskRepository.upsert(saved)
+            return saved
+        }
+        val saved = editor.toTask()
+        taskRepository.upsert(saved)
+        return saved
+    }
+
+    private suspend fun loadIntervals(editor: TaskEditorState, date: LocalDate): List<TimeBlock> {
+        val templateId = editor.id
+        val series = editor.seriesId ?: templateId?.value
+        if (date == editor.scheduledDate && templateId != null) {
+            return taskRepository.get(templateId)?.blocks ?: emptyList()
+        }
+        if (series == null) return emptyList()
+        return taskRepository.observeTasks(date).first().firstOrNull { task ->
+            task.seriesId == series || task.id.value == series
+        }?.blocks ?: emptyList()
+    }
+
+    private suspend fun writeIntervals(
+        editor: TaskEditorState,
+        date: LocalDate,
+        blocks: List<TimeBlock>,
+    ) {
+        val templateId = editor.id ?: return
+        val series = editor.seriesId ?: templateId.value
+        if (date == editor.scheduledDate) {
+            val stored = taskRepository.get(templateId) ?: return
+            taskRepository.upsert(stored.copy(blocks = blocks))
+            return
+        }
+        val existing = taskRepository.observeTasks(date).first().firstOrNull { task ->
+            task.seriesId == series || task.id.value == series
+        }
+        if (existing != null) {
+            taskRepository.upsert(existing.copy(blocks = blocks))
+            return
+        }
+        if (blocks.isEmpty()) return
+        val template = taskRepository.get(templateId) ?: return
+        taskRepository.upsert(
+            TaskInstances.daySubtask(template, date, TaskId(UUID.randomUUID().toString()))
+                .copy(blocks = blocks),
+        )
+    }
+
     private fun addBlock() {
         val now = minuteOfNow()
         updateEditor { editor ->
+            if (editor.recurrence !is RecurrenceRule.None && editor.intervalDate == null) {
+                return@updateEditor editor
+            }
             val start = now.mod(TimeMath.MINUTES_PER_DAY)
             val end = (start + 60).mod(TimeMath.MINUTES_PER_DAY)
+            val block = TimeBlock(
+                start,
+                end,
+                id = UUID.randomUUID().toString(),
+                plannedMinutes = TimeMath.durationMinutes(start, end).coerceAtLeast(SessionDuration.MIN_MINUTES),
+            )
             editor.copy(
-                blocks = editor.blocks + TimeBlock(start, end),
+                blocks = editor.blocks + block,
                 error = null,
             )
         }
     }
 
     private fun removeBlock(index: Int) {
-        val now = minuteOfNow()
         updateEditor { editor ->
-            val block = editor.blocks.getOrNull(index) ?: return@updateEditor editor
-            if (block.isClosed(now)) return@updateEditor editor
+            if (editor.blocks.getOrNull(index) == null) return@updateEditor editor
             editor.copy(blocks = editor.blocks.filterIndexed { i, _ -> i != index }, error = null)
         }
     }
 
     private fun updateBlock(index: Int, transform: (TimeBlock) -> TimeBlock) {
-        val now = minuteOfNow()
         updateEditor { editor ->
-            val block = editor.blocks.getOrNull(index) ?: return@updateEditor editor
-            if (block.isClosed(now)) return@updateEditor editor
+            if (editor.blocks.getOrNull(index) == null) return@updateEditor editor
             editor.copy(
                 blocks = editor.blocks.mapIndexed { i, current ->
                     if (i == index) transform(current) else current

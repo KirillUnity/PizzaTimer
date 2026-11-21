@@ -22,9 +22,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.SnackbarHost
@@ -52,16 +58,24 @@ import com.example.clockplannerproject.kit.compose.DualTimeDial
 import com.example.clockplannerproject.kit.compose.DayTaskSummaryCard
 import com.example.clockplannerproject.kit.compose.ListDayView
 import com.example.clockplannerproject.kit.compose.TaskBottomSheet
+import com.example.clockplannerproject.kit.core.Appearance
+import com.example.clockplannerproject.kit.core.BreakSession
+import com.example.clockplannerproject.kit.core.BuiltInCourse
+import com.example.clockplannerproject.kit.core.BuiltInPractice
+import com.example.clockplannerproject.kit.core.HardenKind
+import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskStatus
-import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.PauseMood
 import com.example.clockplannerproject.kit.core.taskAppearances
 import com.example.clockplannerproject.kit.core.config.TimeDialConfig
 import com.example.clockplannerproject.kit.core.layout.ReflowMode
+import android.media.MediaPlayer
+import androidx.compose.ui.platform.LocalContext
+import com.example.clockplannerproject.kit.core.time.SessionDuration
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
@@ -72,13 +86,38 @@ import com.example.clockplannerproject.ui.day.flow.DayFlowHours
 import com.example.clockplannerproject.ui.day.flow.PauseSlipSheet
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.EmeraldWork
+import com.example.clockplannerproject.ui.theme.OnTerracotta
 import com.example.clockplannerproject.ui.theme.PaperSecondary
 import com.example.clockplannerproject.ui.theme.SandRest
+import com.example.clockplannerproject.ui.theme.TerracottaNow
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.toJavaLocalDate
 import java.time.format.DateTimeFormatter
 import org.koin.androidx.compose.koinViewModel
+
+/**
+ * Title for the day date strip. Today, yesterday, and tomorrow use catalog words.
+ * Any other date keeps the short weekday-and-month form. A missing date stays on
+ * the loading string.
+ */
+@Composable
+private fun dayStripTitle(date: LocalDate?, localToday: LocalDate?): String {
+    if (date == null) return stringResource(R.string.tasks_date_loading)
+    val relative = if (localToday == null) {
+        RelativeDay.Other
+    } else {
+        relativeDay(date, localToday)
+    }
+    return when (relative) {
+        RelativeDay.Today -> stringResource(R.string.day_relative_today)
+        RelativeDay.Yesterday -> stringResource(R.string.day_relative_yesterday)
+        RelativeDay.Tomorrow -> stringResource(R.string.day_relative_tomorrow)
+        RelativeDay.Other -> remember(date) {
+            DateTimeFormatter.ofPattern("EEE, d MMM").format(date.toJavaLocalDate())
+        }
+    }
+}
 
 @Composable
 fun DayRoute(
@@ -87,11 +126,15 @@ fun DayRoute(
     onEditTask: (Task) -> Unit = {},
     onOpenReports: () -> Unit = {},
     viewModel: DayViewModel = koinViewModel(),
+    courseViewModel: com.example.clockplannerproject.ui.settings.course.CourseViewModel = koinViewModel(),
 ) {
+    val customCourses by courseViewModel.custom.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarResId by remember { mutableStateOf<Int?>(null) }
     var snackbarNonce by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    var offerMinutes by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
@@ -100,6 +143,11 @@ fun DayRoute(
                     snackbarNonce += 1
                 }
                 is DayUiEffect.OpenEditor -> onEditTask(effect.task)
+                DayUiEffect.PlayChime -> {
+                    val player = MediaPlayer.create(context, R.raw.session_chime)
+                    player?.setOnCompletionListener { it.release() }
+                    player?.start()
+                }
             }
         }
     }
@@ -109,8 +157,24 @@ fun DayRoute(
         if (snackbarNonce == 0) return@LaunchedEffect
         snackbarHostState.showSnackbar(text)
     }
+    val breakTitle = stringResource(R.string.break_title)
+    val openBreak = BreakSession.openBreak(state.tasks)
+    val workFromBreak = openBreak?.let { wedge ->
+        BreakSession.workId(wedge)?.let { id -> state.tasks.find { it.id == id } }
+    }
+    val shown = state.copy(
+        tasks = state.tasks.map { task ->
+            if (BreakSession.isBreak(task)) task.copy(title = breakTitle) else task
+        },
+        selectedTask = state.selectedTask?.let { task ->
+            when {
+                BreakSession.isBreak(task) -> workFromBreak ?: task.copy(title = breakTitle)
+                else -> task
+            }
+        },
+    )
     DayScreen(
-        state = state,
+        state = shown,
         onRetry = { viewModel.onIntent(DayUiIntent.Retry) },
         onTaskClick = { viewModel.onIntent(DayUiIntent.SelectTask(it)) },
         onListTaskClick = { viewModel.onIntent(DayUiIntent.OpenTaskDetails(it)) },
@@ -133,9 +197,32 @@ fun DayRoute(
         },
         onResizeCancel = { viewModel.onIntent(DayUiIntent.CancelResize) },
         onToggleHideCompleted = { viewModel.onIntent(DayUiIntent.ToggleHideCompleted) },
-        onSetViewMode = { viewModel.onIntent(DayUiIntent.SetViewMode(it)) },
-        onStartTimer = { viewModel.onIntent(DayUiIntent.StartTimer) },
+        onApplyLook = { viewModel.onIntent(DayUiIntent.SetLook(it)) },
+        onStartTimer = {
+            if (BreakSession.openBreak(state.tasks) != null) {
+                viewModel.onIntent(DayUiIntent.ContinueBreak)
+            } else {
+                val nowMinute = state.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: 0
+                val end = state.selectedTask?.let { SessionDuration.plannedEnd(it, nowMinute) }
+                offerMinutes = SessionDuration.suggest(nowMinute, end)
+            }
+        },
         onPauseTimer = { viewModel.onIntent(DayUiIntent.PauseTimer) },
+        onContinueBreak = { viewModel.onIntent(DayUiIntent.ContinueBreak) },
+        onFinishBreak = { viewModel.onIntent(DayUiIntent.FinishBreak) },
+        onOpenCompletion = { viewModel.onIntent(DayUiIntent.OpenCompletion) },
+        onScoreInterval = { viewModel.onIntent(DayUiIntent.OpenIntervalCompletion(it)) },
+        onEditCompletion = { viewModel.onIntent(DayUiIntent.EditCompletion(it)) },
+        onSubmitCompletion = { viewModel.onIntent(DayUiIntent.SubmitCompletion) },
+        onDismissCompletion = { viewModel.onIntent(DayUiIntent.DismissCompletion) },
+        onSkipNudge = { viewModel.onIntent(DayUiIntent.SkipNudge) },
+        onAcceptNudge = { viewModel.onIntent(DayUiIntent.AcceptNudge(it)) },
+        onFinishCourse = { practice, checked ->
+            viewModel.onIntent(DayUiIntent.FinishCourse(practice, checked))
+        },
+        customCourses = customCourses,
+        onAddCustomCourse = courseViewModel::addCustom,
+        onRefreshCourses = courseViewModel::refresh,
         onPreviousDay = { viewModel.onIntent(DayUiIntent.PreviousDay) },
         onNextDay = { viewModel.onIntent(DayUiIntent.NextDay) },
         onOpenDatePicker = { viewModel.onIntent(DayUiIntent.OpenDatePicker) },
@@ -158,6 +245,18 @@ fun DayRoute(
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
+    val pendingMinutes = offerMinutes
+    if (pendingMinutes != null) {
+        DurationSheet(
+            minutes = pendingMinutes,
+            onMinutes = { offerMinutes = it },
+            onConfirm = {
+                offerMinutes = null
+                viewModel.onIntent(DayUiIntent.StartFor(pendingMinutes))
+            },
+            onDismiss = { offerMinutes = null },
+        )
+    }
 }
 
 @Composable
@@ -181,9 +280,22 @@ fun DayScreen(
     onResizeCommit: (Task, Int) -> Unit = { _, _ -> },
     onResizeCancel: () -> Unit = {},
     onToggleHideCompleted: () -> Unit = {},
-    onSetViewMode: (ViewMode) -> Unit = {},
+    onApplyLook: (Appearance) -> Unit = {},
     onStartTimer: () -> Unit = {},
     onPauseTimer: () -> Unit = {},
+    onContinueBreak: () -> Unit = {},
+    onFinishBreak: () -> Unit = {},
+    onOpenCompletion: () -> Unit = {},
+    onScoreInterval: (Int) -> Unit = {},
+    onEditCompletion: (CompletionDraft) -> Unit = {},
+    onSubmitCompletion: () -> Unit = {},
+    onDismissCompletion: () -> Unit = {},
+    onSkipNudge: () -> Unit = {},
+    onAcceptNudge: (HardenKind) -> Unit = {},
+    onFinishCourse: (BuiltInPractice, Set<String>) -> Unit = { _, _ -> },
+    customCourses: List<com.example.clockplannerproject.kit.core.CustomCourse> = emptyList(),
+    onAddCustomCourse: (String) -> Unit = {},
+    onRefreshCourses: () -> Unit = {},
     onPreviousDay: () -> Unit = {},
     onNextDay: () -> Unit = {},
     onOpenDatePicker: () -> Unit = {},
@@ -204,6 +316,8 @@ fun DayScreen(
     modifier: Modifier = Modifier,
 ) {
     val showEmpty = !state.isLoading && state.tasks.isEmpty() && state.errorMessageRes == null
+    var menuOpen by remember { mutableStateOf(false) }
+    var courseOpen by remember { mutableStateOf(false) }
     val canvasMode = state.viewMode != ViewMode.LIST
     val nowMinute = state.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: 0
     val flowActive = state.pauseSlipOpen ||
@@ -259,14 +373,7 @@ fun DayScreen(
                 ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val dateLabel = if (state.date == null) {
-                stringResource(R.string.tasks_date_loading)
-            } else {
-                val date = state.date
-                remember(date) {
-                    DateTimeFormatter.ofPattern("EEE, d MMM").format(date.toJavaLocalDate())
-                }
-            }
+            val dateLabel = dayStripTitle(state.date, state.localToday)
             val sessionRunning = state.tasks.any { TaskTimer.hasOpenBlock(it) }
             PaperDateHeader(
                 date = state.date,
@@ -277,15 +384,40 @@ fun DayScreen(
                 subtitle = null,
                 showDate = false,
             )
-            DayDoneLine(tasks = state.tasks, now = state.now)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = stringResource(R.string.cd_day_menu),
+                    )
+                }
+                if (canvasMode) {
+                    AmPmRow(
+                        selected = state.dialHalf,
+                        onSelect = onSetDialHalf,
+                    )
+                }
+            }
+            if (!sessionRunning) {
+                DayDoneLine(tasks = state.tasks, now = state.now)
+            }
+            val openBreak = BreakSession.openBreak(state.tasks)
+            val breakWorkId = openBreak?.let(BreakSession::workId)
+            if (openBreak != null && breakWorkId != null &&
+                state.tasks.any { it.id == breakWorkId }
+            ) {
+                FinishTaskButton(onFinish = onFinishBreak)
+            }
             DayChromeRow(
-                showHalves = canvasMode,
+                showHalves = false,
                 selectedHalf = state.dialHalf,
                 onSelectHalf = onSetDialHalf,
-                selectedMode = state.viewMode,
-                onSelectMode = onSetViewMode,
-                hideCompleted = state.hideCompleted,
-                onToggleHideCompleted = onToggleHideCompleted,
                 quiet = sessionRunning,
                 resetEnabled = state.hasUserRotation,
                 onResetRotation = onResetRotation,
@@ -347,6 +479,8 @@ fun DayScreen(
                                 onDismissSelection = onDismissTask,
                                 onOpenDetails = onOpenDetails,
                                 onHalfChange = onSetDialHalf,
+                                minutesLeft = state.sessionMinutesLeft,
+                                sessionPaused = BreakSession.openBreak(state.tasks) != null,
                                 modifier = dialModifier,
                             )
                         },
@@ -404,6 +538,8 @@ fun DayScreen(
                         onDismissSelection = onDismissTask,
                         onOpenDetails = onOpenDetails,
                         onHalfChange = onSetDialHalf,
+                        minutesLeft = state.sessionMinutesLeft,
+                        sessionPaused = BreakSession.openBreak(state.tasks) != null,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -425,6 +561,8 @@ fun DayScreen(
                         onOpenDetails = onOpenDetails,
                         selectedHalf = state.dialHalf,
                         onHalfChange = onSetDialHalf,
+                        minutesLeft = state.sessionMinutesLeft,
+                        sessionPaused = BreakSession.openBreak(state.tasks) != null,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -437,6 +575,32 @@ fun DayScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
         )
+        if (menuOpen) {
+            val look = Appearance(
+                viewMode = state.viewMode,
+                accentArgb = state.accentArgb,
+                completedArgb = state.completedArgb,
+                background = state.background,
+            )
+            DaySideMenu(
+                appearance = look,
+                hideCompleted = state.hideCompleted,
+                onAppearance = onApplyLook,
+                onToggleHideCompleted = onToggleHideCompleted,
+                onDismiss = { menuOpen = false },
+                showCourseOffer = BuiltInCourse.offer(
+                    workOpen = state.tasks.any { task ->
+                        !BreakSession.isBreak(task) && TaskTimer.hasOpenBlock(task)
+                    },
+                    onBreak = BreakSession.openBreak(state.tasks) != null,
+                    needsConcentration = BuiltInCourse.needsConcentration(state.selectedTask),
+                ),
+                onOpenCourse = {
+                    menuOpen = false
+                    courseOpen = true
+                },
+            )
+        }
     }
     state.sheetTask?.let { task ->
         TaskBottomSheet(
@@ -447,21 +611,29 @@ fun DayScreen(
             onDelete = onRequestDelete,
             onDuplicate = onDuplicate,
             onMove = onRequestMove,
+            onEditScores = onOpenCompletion,
+            onScoreInterval = onScoreInterval,
         )
     }
-    state.pendingDelete?.let { task ->
+    state.pendingDelete?.let {
         AlertDialog(
             onDismissRequest = onDismissDelete,
-            title = { Text(stringResource(R.string.task_delete_title)) },
-            text = { Text(stringResource(R.string.task_delete_body, task.title)) },
+            title = { Text(stringResource(R.string.task_delete_day_title)) },
+            text = { Text(stringResource(R.string.task_delete_day_body)) },
             confirmButton = {
-                TextButton(onClick = onConfirmDelete) {
-                    Text(stringResource(R.string.task_delete_confirm))
+                Button(
+                    onClick = onDismissDelete,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = TerracottaNow,
+                        contentColor = OnTerracotta,
+                    ),
+                ) {
+                    Text(stringResource(R.string.task_delete_keep))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissDelete) {
-                    Text(stringResource(R.string.task_delete_cancel))
+                TextButton(onClick = onConfirmDelete) {
+                    Text(stringResource(R.string.task_delete_confirm))
                 }
             },
         )
@@ -478,6 +650,38 @@ fun DayScreen(
             selectedDate = state.date,
             onConfirm = onSelectDate,
             onDismiss = onDismissDatePicker,
+        )
+    }
+    if (state.completion.open) {
+        CompletionSheet(
+            draft = state.completion,
+            onDraft = onEditCompletion,
+            onSubmit = onSubmitCompletion,
+            onDismiss = onDismissCompletion,
+        )
+    }
+    state.difficultyOffer?.let { offer ->
+        DifficultyOfferCard(
+            title = offer.title,
+            onSkip = onSkipNudge,
+            onAccept = onAcceptNudge,
+        )
+    }
+    val workStillOpen = state.tasks.any { task ->
+        !BreakSession.isBreak(task) && TaskTimer.hasOpenBlock(task)
+    }
+    val courseOffered = BuiltInCourse.offer(
+        workOpen = workStillOpen,
+        onBreak = BreakSession.openBreak(state.tasks) != null,
+        needsConcentration = BuiltInCourse.needsConcentration(state.selectedTask),
+    )
+    if (courseOpen && courseOffered) {
+        com.example.clockplannerproject.ui.settings.course.CourseScreen(
+            onBack = { courseOpen = false },
+            onFinish = onFinishCourse,
+            custom = customCourses,
+            onAddCustom = onAddCustomCourse,
+            onRefresh = onRefreshCourses,
         )
     }
 }
@@ -499,6 +703,8 @@ private fun ResponsiveDialWorkspace(
     onDismissSelection: () -> Unit,
     onOpenDetails: () -> Unit,
     onHalfChange: (DialHalf) -> Unit,
+    minutesLeft: Int? = null,
+    sessionPaused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -527,6 +733,8 @@ private fun ResponsiveDialWorkspace(
                     onDismissSelection = onDismissSelection,
                     onOpenDetails = onOpenDetails,
                     onHalfChange = onHalfChange,
+                    minutesLeft = minutesLeft,
+                    sessionPaused = sessionPaused,
                     modifier = Modifier.size(side),
                 )
             }
@@ -556,6 +764,8 @@ private fun ResponsiveDialWorkspace(
                             onDismissSelection = onDismissSelection,
                             onOpenDetails = onOpenDetails,
                             onHalfChange = onHalfChange,
+                            minutesLeft = minutesLeft,
+                            sessionPaused = sessionPaused,
                             modifier = Modifier
                                 .widthIn(max = CompactDialMax)
                                 .fillMaxWidth()
@@ -606,6 +816,8 @@ private fun ResponsiveDialWorkspace(
                         onDismissSelection = onDismissSelection,
                         onOpenDetails = onOpenDetails,
                         onHalfChange = onHalfChange,
+                        minutesLeft = minutesLeft,
+                        sessionPaused = sessionPaused,
                         modifier = Modifier.size(side),
                     )
                 }
@@ -618,6 +830,30 @@ private fun ResponsiveDialWorkspace(
                         .fillMaxHeight(),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FinishTaskButton(
+    onFinish: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Button(
+            onClick = onFinish,
+            modifier = Modifier.height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = TerracottaNow,
+                contentColor = OnTerracotta,
+            ),
+        ) {
+            Text(stringResource(R.string.break_finish))
         }
     }
 }
@@ -639,6 +875,8 @@ private fun DialWorkspace(
     onDismissSelection: () -> Unit,
     onOpenDetails: () -> Unit,
     onHalfChange: (DialHalf) -> Unit,
+    minutesLeft: Int? = null,
+    sessionPaused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     DualTimeDial(
@@ -653,6 +891,8 @@ private fun DialWorkspace(
         onResizeCancel = onResizeCancel,
         onStartTimer = onStartTimer,
         onPauseTimer = onPauseTimer,
+        minutesLeft = minutesLeft,
+        sessionPaused = sessionPaused,
         onDismissSelection = onDismissSelection,
         onOpenDetails = onOpenDetails,
         selectedHalf = selectedHalf,

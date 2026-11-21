@@ -42,6 +42,8 @@ data class TaskReport(
     val createdAtEpochMillis: Long,
     val text: String,
     val attachment: ReportAttachment? = null,
+    /** Interval this note belongs to, or null for a note saved before intervals had notes. */
+    val blockId: String? = null,
 )
 
 /**

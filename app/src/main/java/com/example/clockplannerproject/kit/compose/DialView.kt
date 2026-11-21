@@ -72,6 +72,7 @@ fun DialView(
     nowMinute: Float,
     half: DialHalf,
     onTaskClick: (Task) -> Unit,
+    onDismissSelection: () -> Unit = {},
     modifier: Modifier = Modifier,
     nowMarkerContentDescription: String = "Current time on the dial",
     onUserRotationDelta: (Float) -> Unit = {},
@@ -175,7 +176,7 @@ fun DialView(
                             canvasSize = canvasSize,
                             half = half,
                         )
-                        if (hit != null) onTaskClick(hit)
+                        if (hit != null) onTaskClick(hit) else onDismissSelection()
                     },
                     onResizePreview = onResizePreview,
                     onResizeCommit = onResizeCommit,

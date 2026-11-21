@@ -36,6 +36,21 @@ import com.example.clockplannerproject.ui.theme.TerracottaNow
 import kotlinx.datetime.LocalTime
 
 /**
+ * Pause only while a work interval is open. Idle and break use Play.
+ *
+ * @since 1.3.0
+ */
+internal fun holeTimerShowsPause(workOpen: Boolean): Boolean = workOpen
+
+/**
+ * Break caption after Pause. Shown even on a compact hole.
+ *
+ * @since 1.3.0
+ */
+internal fun holeSessionCaptionRes(paused: Boolean): Int =
+    if (paused) R.string.break_title else R.string.dial_this_session
+
+/**
  * Compact Start / Pause in the ring hole (and pizza / petals hub).
  * The control is an icon only. The spoken name stays on the icon.
  *
@@ -47,6 +62,7 @@ fun TimerHoleOverlay(
     canStart: Boolean,
     onStart: () -> Unit,
     onPause: () -> Unit,
+    sessionPaused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val startCd = stringResource(R.string.cd_timer_start)
@@ -62,7 +78,16 @@ fun TimerHoleOverlay(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        if (running) {
+        if (sessionPaused) {
+            Text(
+                text = stringResource(R.string.break_title),
+                style = MaterialTheme.typography.labelSmall,
+                color = PaperSecondary,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        if (holeTimerShowsPause(running)) {
             FilledIconButton(
                 onClick = onPause,
                 modifier = Modifier.size(56.dp),
@@ -122,10 +147,11 @@ fun LiveChronoHole(
 }
 
 /**
- * Running DIAL hole: flow label, elapsed, task title, session caption, and a pause icon.
- * On a short hole the title and caption drop so elapsed and Pause stay visible.
+ * Running DIAL hole: minutes left or flow, task title, session caption, and Pause.
+ * On pause the caption is the break title and the control is Play.
  *
  * @param holeDiameter inner diameter of the ring, in dp
+ * @param paused true when the work interval is closed and a break is open
  * @since 0.5.0
  */
 @Composable
@@ -134,9 +160,13 @@ fun RunningSessionHole(
     elapsed: String,
     holeDiameter: Dp,
     onPause: () -> Unit,
+    minutesLeft: Int? = null,
+    paused: Boolean = false,
+    onResume: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pauseCd = stringResource(R.string.cd_timer_pause)
+    val startCd = stringResource(R.string.cd_timer_start)
     val showDetail = holeDiameter >= RoomForSessionDetail
     val button = if (showDetail) SessionPauseButton else CompactPauseButton
     Column(
@@ -144,20 +174,30 @@ fun RunningSessionHole(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = stringResource(R.string.dial_in_flow),
-            style = MaterialTheme.typography.labelSmall,
-            color = TerracottaNow,
-            maxLines = 1,
-            softWrap = false,
-        )
-        Text(
-            text = elapsed,
-            style = MaterialTheme.typography.headlineSmall,
-            color = PaperInk,
-            maxLines = 1,
-            softWrap = false,
-        )
+        if (minutesLeft != null) {
+            Text(
+                text = stringResource(R.string.session_minutes_left, minutesLeft),
+                style = MaterialTheme.typography.labelSmall,
+                color = PaperSecondary,
+                maxLines = 1,
+                softWrap = false,
+            )
+        } else if (!paused) {
+            Text(
+                text = stringResource(R.string.dial_in_flow),
+                style = MaterialTheme.typography.labelSmall,
+                color = TerracottaNow,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Text(
+                text = elapsed,
+                style = MaterialTheme.typography.headlineSmall,
+                color = PaperInk,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
         if (showDetail) {
             Text(
                 text = taskTitle,
@@ -166,8 +206,10 @@ fun RunningSessionHole(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (paused || showDetail) {
             Text(
-                text = stringResource(R.string.dial_this_session),
+                text = stringResource(holeSessionCaptionRes(paused)),
                 style = MaterialTheme.typography.labelSmall,
                 color = PaperSecondary,
                 maxLines = 1,
@@ -175,16 +217,17 @@ fun RunningSessionHole(
             )
         }
         FilledIconButton(
-            onClick = onPause,
+            onClick = if (paused) onResume else onPause,
             modifier = Modifier.size(button),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = TerracottaNow,
                 contentColor = OnTerracotta,
             ),
         ) {
+            val showPause = holeTimerShowsPause(workOpen = !paused)
             Icon(
-                imageVector = PauseBars,
-                contentDescription = pauseCd,
+                imageVector = if (showPause) PauseBars else Icons.Filled.PlayArrow,
+                contentDescription = if (showPause) pauseCd else startCd,
             )
         }
     }

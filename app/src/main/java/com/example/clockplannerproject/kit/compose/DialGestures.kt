@@ -101,6 +101,7 @@ internal suspend fun PointerInputScope.detectDialGestures(
                     onResizeCommit(task, committed)
                 } else {
                     onResizeCancel()
+                    onTap(start)
                 }
             }
         }

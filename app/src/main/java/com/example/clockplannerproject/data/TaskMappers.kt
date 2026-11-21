@@ -43,17 +43,20 @@ internal fun Task.toEntity(): TaskEntity = TaskEntity(
 internal fun Task.toBlockEntities(): List<TimeBlockEntity> =
     blocks.mapIndexed { index, block ->
         TimeBlockEntity(
-            id = "${id.value}-$index",
+            id = block.id.ifBlank { "${id.value}-$index" },
             taskId = id.value,
             startMinute = block.startMinute,
             endMinute = block.endMinute,
             sortIndex = index,
+            plannedMinutes = block.plannedMinutes,
         )
     }
 
 internal fun TimeBlockEntity.toDomain(): TimeBlock = TimeBlock(
     startMinute = startMinute,
     endMinute = endMinute,
+    id = id,
+    plannedMinutes = plannedMinutes,
 )
 
 internal fun decodeRecurrence(kind: String, mask: Int): RecurrenceRule = when (kind) {

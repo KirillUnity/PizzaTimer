@@ -21,9 +21,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
+import com.example.clockplannerproject.kit.core.BreakSession
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskStatus
+import com.example.clockplannerproject.kit.core.TaskTimer
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.clipTaskToHalf
@@ -60,6 +62,8 @@ fun TimeDial(
     onResizeCancel: () -> Unit = {},
     onStartTimer: () -> Unit = {},
     onPauseTimer: () -> Unit = {},
+    minutesLeft: Int? = null,
+    sessionPaused: Boolean = false,
     onDismissSelection: () -> Unit = {},
     onOpenDetails: () -> Unit = {},
 ) {
@@ -141,6 +145,7 @@ fun TimeDial(
                 val original = tasks.find { it.id == layoutTask.id } ?: layoutTask
                 onTaskClick(original)
             },
+            onDismissSelection = onDismissSelection,
             modifier = Modifier.fillMaxSize(),
             nowMarkerContentDescription = stringResource(R.string.cd_now_marker),
             onUserRotationDelta = onUserRotationDelta,
@@ -153,14 +158,20 @@ fun TimeDial(
             onResizeCancel = onResizeCancel,
             accessibilityTasks = accessibilityTasks,
         )
-        val hole = minOf(maxWidth, maxHeight) * DialHoleDiameterFraction
+        val hole = minOf(maxWidth, maxHeight) * overlayHoleDiameterFraction(config.viewMode)
+        val holeTask = selectedTask
+            ?: tasks.firstOrNull { task ->
+                !BreakSession.isBreak(task) && TaskTimer.hasOpenBlock(task)
+            }
         DialHoleContent(
             now = currentTime,
-            selectedTask = if (compact) null else selectedTask,
+            selectedTask = holeTask,
             viewMode = config.viewMode,
             holeDiameter = hole,
             onStartTimer = onStartTimer,
             onPauseTimer = onPauseTimer,
+            minutesLeft = minutesLeft,
+            sessionPaused = sessionPaused,
         )
         if (!compact) {
             selectedTask?.let { selected ->

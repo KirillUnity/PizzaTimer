@@ -3,7 +3,9 @@ package com.example.clockplannerproject.ui.stats
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.kit.core.DayStateStats
 import com.example.clockplannerproject.kit.core.ReportAttachmentImporter
+import com.example.clockplannerproject.kit.core.TaskCompletionCodec
 import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.Task
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -71,9 +74,22 @@ class ReportsViewModel(
     init {
         viewModelScope.launch {
             try {
-                reportRepository.observeAllReports().collect { reports ->
+                combine(
+                    reportRepository.observeAllReports(),
+                    taskRepository.observeAll(),
+                ) { reports, tasks ->
+                    val today = timeProvider.today()
+                    val dayTasks = tasks.filter { it.date == today }
+                    val notes = reports.filterNot { TaskCompletionCodec.isRecord(it.text) }
+                    notes to DayStateStats.of(dayTasks, reports)
+                }.collect { (notes, stats) ->
                     _state.update {
-                        it.copy(reports = reports, isLoading = false, errorMessage = null)
+                        it.copy(
+                            reports = notes,
+                            isLoading = false,
+                            errorMessage = null,
+                            dayStats = stats,
+                        )
                     }
                 }
             } catch (cancelled: CancellationException) {

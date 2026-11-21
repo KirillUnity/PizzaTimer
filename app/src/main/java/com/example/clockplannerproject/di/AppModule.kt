@@ -28,7 +28,9 @@ import com.example.clockplannerproject.kit.core.planner.PlannerPhrases
 import com.example.clockplannerproject.kit.core.planner.PlannerPlanStore
 import com.example.clockplannerproject.kit.core.planner.PlannerSource
 import com.example.clockplannerproject.ui.day.DayViewModel
+import com.example.clockplannerproject.ui.settings.GoalsViewModel
 import com.example.clockplannerproject.ui.settings.SettingsViewModel
+import com.example.clockplannerproject.ui.settings.course.CourseViewModel
 import com.example.clockplannerproject.ui.settings.practice.PracticeViewModel
 import com.example.clockplannerproject.ui.stats.ReportsViewModel
 import com.example.clockplannerproject.ui.task.TasksViewModel
@@ -52,15 +54,26 @@ val appModule = module {
     single { DialPhotoSelection(get(), get()) }
     single<FlowMemoryStore> { DataStoreFlowMemoryStore.create(androidContext()) }
     single<PracticeProgressStore> { DataStorePracticeProgressStore.create(androidContext()) }
+    single<com.example.clockplannerproject.kit.core.GoalBookStore> {
+        com.example.clockplannerproject.data.DataStoreGoalBookStore.create(androidContext())
+    }
+    single<com.example.clockplannerproject.kit.core.CourseHistoryStore> {
+        com.example.clockplannerproject.data.DataStoreCourseHistoryStore.create(androidContext())
+    }
+    single<com.example.clockplannerproject.kit.core.CustomCourseStore> {
+        com.example.clockplannerproject.data.DataStoreCustomCourseStore.create(androidContext())
+    }
     single<PlannerPlanStore> { DataStorePlannerPlanStore.create(androidContext()) }
     single<PlannerPhrases> { AndroidPlannerPhrases(androidContext()) }
     single<PlannerSource> { MockPlannerSource(get(), get(), get()) }
     single<TimeProvider> { SystemTimeProvider() }
     single<SampleSeedFlagStore> { DataStoreSampleSeedFlagStore.create(androidContext()) }
-    single { SampleDaySeeder(get(), get(), get()) }
+    single { SampleDaySeeder(get(), get(), get(), purgeFixtures = true) }
     viewModelOf(::DayViewModel)
     viewModelOf(::TasksViewModel)
     viewModelOf(::ReportsViewModel)
     viewModelOf(::SettingsViewModel)
+    viewModelOf(::GoalsViewModel)
+    viewModelOf(::CourseViewModel)
     viewModelOf(::PracticeViewModel)
 }

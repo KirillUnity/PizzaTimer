@@ -2,7 +2,7 @@ schema: spec-driven
 skillsScope: project
 
 context: |
-  Project: TimeDial (repo ClockPlannerProject), product mission «Поток» in spec/mission.md (draft 0.3).
+  Project: TimeDial (repo ClockPlannerProject), product mission «Поток» in spec/mission.md (draft 0.6: a clear next-action sequence pulled by the flow experience, not by a whip; attention craft in §6.3; review leaves as a file the person assembled, §6.5).
   Stack: Kotlin 2.0.21, AGP 8.13.2, Compose BOM 2024.09.00, Material 3, MVI (UiState/UiIntent/UiEffect), Koin 4.0.2, Room 2.6.1, DataStore, kotlinx-datetime 0.6.2. Single module :app, namespace com.example.clockplannerproject, minSdk 29, targetSdk 36.
   Packages: kit.core, kit.render, kit.compose, data, di, ui.day, ui.task, ui.settings, ui.stats.
   Constraints: no Hilt, no KMP, no Room Migration classes (version++ and fallbackToDestructiveMigration only), kit.render must not import Room or ui, UI must not reimplement TimeMath or leftover shares, closed TimeBlocks are immutable, Start/Pause appends intervals.

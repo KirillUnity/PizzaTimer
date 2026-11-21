@@ -16,7 +16,6 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.minus
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,67 +24,61 @@ class SampleDaySeederTest {
     private val today = LocalDate(2026, 10, 6)
 
     @Test
-    fun firstEmptyCall_insertsTypicalDayAndSetsFlag() = runTest {
+    fun testsDefault_doesNotInsertOrDelete() = runTest {
+        val fixtures = SampleTasks.typicalDay(today)
+        val repository = RecordingTasks(fixtures)
+        SampleDaySeeder(
+            taskRepository = repository,
+            timeProvider = FixedToday(today),
+            sampleSeedFlagStore = MemoryFlag(),
+        ).seedIfEmpty()
+
+        assertEquals(fixtures.map { it.id }, repository.observeAll().first().map { it.id })
+        assertEquals(0, repository.upserts)
+    }
+
+    @Test
+    fun emptyStore_staysEmpty() = runTest {
         val repository = RecordingTasks()
         val flag = MemoryFlag()
         seeder(repository, flag).seedIfEmpty()
 
-        val stored = repository.observeAll().first()
-        assertEquals(SampleTasks.typicalDay(today).map { it.id }, stored.map { it.id })
-        assertTrue(stored.all { it.date == today })
+        assertTrue(repository.observeAll().first().isEmpty())
+        assertEquals(0, repository.upserts)
         assertTrue(flag.handled)
     }
 
     @Test
-    fun secondEmptyCall_doesNotInsert() = runTest {
+    fun fixtureIds_areRemoved() = runTest {
+        val fixtures = SampleTasks.typicalDay(today)
+        val kept = Task(
+            id = TaskId("kept"),
+            title = "Kept",
+            colorArgb = 0xFF112233,
+            date = today.minus(1, DateTimeUnit.DAY),
+        )
+        val repository = RecordingTasks(fixtures + kept)
+        val flag = MemoryFlag()
+
+        seeder(repository, flag).seedIfEmpty()
+
+        assertEquals(listOf(kept.id), repository.observeAll().first().map { it.id })
+        assertEquals(0, repository.upserts)
+        assertTrue(flag.handled)
+    }
+
+    @Test
+    fun secondCall_doesNotInsert() = runTest {
         val repository = RecordingTasks()
         val flag = MemoryFlag()
         val seeder = seeder(repository, flag)
         seeder.seedIfEmpty()
-        repository.clear()
-        val writesAfterClear = repository.upserts
+        val writes = repository.upserts
 
         seeder.seedIfEmpty()
 
         assertTrue(repository.observeAll().first().isEmpty())
-        assertEquals(writesAfterClear, repository.upserts)
-        assertTrue(flag.handled)
-    }
-
-    @Test
-    fun nonEmptyDatabase_setsFlagAndInsertsNothing() = runTest {
-        val yesterday = today.minus(1, DateTimeUnit.DAY)
-        val existing = Task(
-            id = TaskId("kept"),
-            title = "Kept",
-            colorArgb = 0xFF112233,
-            date = yesterday,
-        )
-        val repository = RecordingTasks(listOf(existing))
-        val flag = MemoryFlag()
-
-        seeder(repository, flag).seedIfEmpty()
-
-        assertEquals(listOf(existing.id), repository.observeAll().first().map { it.id })
-        assertEquals(0, repository.upserts)
-        assertTrue(flag.handled)
-    }
-
-    @Test
-    fun releaseBuild_doesNotReadOrWrite() = runTest {
-        val repository = RecordingTasks()
-        val flag = MemoryFlag()
-        SampleDaySeeder(
-            taskRepository = repository,
-            timeProvider = FixedToday(today),
-            sampleSeedFlagStore = flag,
-            seedEnabled = false,
-        ).seedIfEmpty()
-
-        assertFalse(repository.observedAll)
-        assertEquals(0, repository.upserts)
-        assertFalse(flag.handled)
-        assertFalse(flag.reads)
+        assertEquals(writes, repository.upserts)
     }
 
     private fun seeder(repository: RecordingTasks, flag: MemoryFlag): SampleDaySeeder =
@@ -93,7 +86,7 @@ class SampleDaySeederTest {
             taskRepository = repository,
             timeProvider = FixedToday(today),
             sampleSeedFlagStore = flag,
-            seedEnabled = true,
+            purgeFixtures = true,
         )
 }
 

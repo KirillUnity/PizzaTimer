@@ -1,6 +1,7 @@
 package com.example.clockplannerproject.kit.core
 
 import com.example.clockplannerproject.kit.core.time.TimeMath
+import java.util.UUID
 
 /**
  * Append-only Start / Pause. Closed [TimeBlock]s are never rewritten.
@@ -16,11 +17,16 @@ object TaskTimer {
      * Appends `[nowMinute, open)` and sets [TaskStatus.IN_PROGRESS].
      * No-op when an open block already exists.
      */
-    fun start(task: Task, nowMinute: Int): Task {
+    fun start(task: Task, nowMinute: Int, plannedMinutes: Int? = null): Task {
         if (!canStart(task)) return task
         val start = nowMinute.mod(TimeMath.MINUTES_PER_DAY)
         return task.copy(
-            blocks = task.blocks + TimeBlock(startMinute = start, endMinute = null),
+            blocks = task.blocks + TimeBlock(
+                startMinute = start,
+                endMinute = null,
+                id = UUID.randomUUID().toString(),
+                plannedMinutes = plannedMinutes,
+            ),
             status = TaskStatus.IN_PROGRESS,
         )
     }

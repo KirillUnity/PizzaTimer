@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.kit.core.Appearance
 import com.example.clockplannerproject.kit.core.AppearancePalette
+import com.example.clockplannerproject.kit.core.GoalBook
 import com.example.clockplannerproject.kit.core.ViewMode
 import com.example.clockplannerproject.kit.core.config.BackgroundConfig
 import com.example.clockplannerproject.kit.compose.userUnderlayReadable
@@ -73,6 +74,21 @@ fun SettingsDestinationContent(
     modifier: Modifier = Modifier,
 ) {
     var practiceOpen by rememberSaveable { mutableStateOf(false) }
+    var courseOpen by rememberSaveable { mutableStateOf(false) }
+    if (courseOpen && !LocalInspectionMode.current) {
+        val courseViewModel: com.example.clockplannerproject.ui.settings.course.CourseViewModel =
+            org.koin.androidx.compose.koinViewModel()
+        val custom by courseViewModel.custom.collectAsStateWithLifecycle()
+        com.example.clockplannerproject.ui.settings.course.CourseScreen(
+            onBack = { courseOpen = false },
+            onFinish = courseViewModel::finish,
+            custom = custom,
+            onAddCustom = courseViewModel::addCustom,
+            onRefresh = courseViewModel::refresh,
+            modifier = modifier,
+        )
+        return
+    }
     if (practiceOpen && !LocalInspectionMode.current) {
         PracticeDestination(
             onBack = { practiceOpen = false },
@@ -93,7 +109,9 @@ fun SettingsDestinationContent(
         )
     } else {
         val viewModel: SettingsViewModel = koinViewModel()
+        val goalsViewModel: GoalsViewModel = koinViewModel()
         val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+        val goals by goalsViewModel.book.collectAsStateWithLifecycle()
         val context = LocalContext.current
         val picker = rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
@@ -109,11 +127,15 @@ fun SettingsDestinationContent(
             onAppearance = viewModel::save,
             onShowOnboarding = onShowOnboarding,
             onOpenPractice = { practiceOpen = true },
+            onOpenCourse = { courseOpen = true },
             onPickPhoto = {
                 picker.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
             },
+            goals = goals,
+            onMainGoal = goalsViewModel::setMain,
+            onAddIntermediate = goalsViewModel::addIntermediate,
             modifier = modifier,
         )
     }
@@ -134,7 +156,11 @@ fun SettingsScreen(
     onAppearance: (Appearance) -> Unit,
     onShowOnboarding: () -> Unit,
     onOpenPractice: () -> Unit,
+    onOpenCourse: () -> Unit = {},
     onPickPhoto: () -> Unit,
+    goals: GoalBook = GoalBook(),
+    onMainGoal: (String) -> Unit = {},
+    onAddIntermediate: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -150,6 +176,12 @@ fun SettingsScreen(
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        SectionLabel(stringResource(R.string.goals_title))
+        GoalsSection(
+            book = goals,
+            onMain = onMainGoal,
+            onAddIntermediate = onAddIntermediate,
         )
         SectionLabel(stringResource(R.string.settings_view_mode))
         SettingsViewModes(
@@ -227,6 +259,17 @@ fun SettingsScreen(
         ) {
             Text(
                 text = stringResource(R.string.settings_practice),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        TextButton(
+            onClick = onOpenCourse,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_course),
                 style = MaterialTheme.typography.titleMedium,
             )
         }

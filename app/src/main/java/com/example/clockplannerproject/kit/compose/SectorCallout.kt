@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
+import com.example.clockplannerproject.kit.core.BreakSession
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.Task
 import com.example.clockplannerproject.kit.core.TaskTimer
@@ -265,10 +266,23 @@ internal const val DialHoleDiameterFraction: Float =
     (1f - 2f * GeometryConfig.OUTER_INSET_FRACTION) *
         (1f - 2f * GeometryConfig.RING_THICKNESS_FRACTION)
 
+/**
+ * Overlay width as a fraction of the square side. Pizza and petals use the
+ * painted hub; DIAL uses the ring hole.
+ */
+internal fun overlayHoleDiameterFraction(viewMode: ViewMode): Float = when (viewMode) {
+    ViewMode.PIZZA, ViewMode.PETALS ->
+        (1f - 2f * GeometryConfig.OUTER_INSET_FRACTION) *
+            GeometryConfig.HUB_RADIUS_FRACTION
+    else -> DialHoleDiameterFraction
+}
+
 private val CALLOUT_WIDTH = 180.dp
 private val CALLOUT_ESTIMATED_HEIGHT = 96.dp
 private val CALLOUT_MARGIN = 8.dp
 private val NUMERAL_KEEP_OUT = 40.dp
+/** Lifts LIVE CHRONO so the 56dp hub button stays on the pie center. */
+private val PizzaChronoLift = 60.dp
 
 /**
  * Hole content: LIVE CHRONO when idle, Start/Pause when a sector is selected.
@@ -284,32 +298,74 @@ fun BoxScope.DialHoleContent(
     holeDiameter: Dp,
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
+    minutesLeft: Int? = null,
+    sessionPaused: Boolean = false,
 ) {
     val task = selectedTask
+    val hubModes = viewMode == ViewMode.PIZZA || viewMode == ViewMode.PETALS
+    val workPaused = sessionPaused &&
+        task != null &&
+        !BreakSession.isBreak(task) &&
+        !TaskTimer.hasOpenBlock(task)
     when {
-        task == null -> LiveChronoHole(
-            now = now,
+        task == null && hubModes -> {
+            TimerHoleOverlay(
+                running = false,
+                canStart = true,
+                onStart = onStartTimer,
+                onPause = onPauseTimer,
+                sessionPaused = sessionPaused,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            LiveChronoHole(
+                now = now,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = -PizzaChronoLift),
+            )
+        }
+        task == null -> Column(
             modifier = Modifier
                 .align(Alignment.Center)
                 .widthIn(max = holeDiameter),
-        )
-        TaskTimer.hasOpenBlock(task) && viewMode == ViewMode.DIAL -> {
-            val open = task.blocks.firstOrNull { it.isOpen }
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            LiveChronoHole(now = now)
+            TimerHoleOverlay(
+                running = false,
+                canStart = true,
+                onStart = onStartTimer,
+                onPause = onPauseTimer,
+                sessionPaused = sessionPaused,
+            )
+        }
+        viewMode == ViewMode.DIAL &&
+            (workPaused || (TaskTimer.hasOpenBlock(task) && !BreakSession.isBreak(task))) -> {
+            val session = task
+            val open = session.blocks.firstOrNull { it.isOpen }
             val nowMinute = now?.let { TimeMath.minuteOfDay(it).toInt() } ?: open?.startMinute ?: 0
             val elapsed = open?.let { formatSessionElapsed(it.startMinute, nowMinute) } ?: "00:00"
             RunningSessionHole(
-                taskTitle = task.title,
+                taskTitle = session.title,
                 elapsed = elapsed,
                 holeDiameter = holeDiameter,
                 onPause = onPauseTimer,
+                minutesLeft = minutesLeft,
+                paused = workPaused,
+                onResume = onStartTimer,
                 modifier = Modifier.align(Alignment.Center),
             )
         }
-        viewMode == ViewMode.DIAL -> TimerHoleOverlay(
-            running = false,
-            canStart = TaskTimer.canStart(task),
+        else -> TimerHoleOverlay(
+            running = holeTimerShowsPause(
+                workOpen = task != null &&
+                    TaskTimer.hasOpenBlock(task) &&
+                    !BreakSession.isBreak(task),
+            ),
+            canStart = task == null || TaskTimer.canStart(task),
             onStart = onStartTimer,
             onPause = onPauseTimer,
+            sessionPaused = sessionPaused,
             modifier = Modifier.align(Alignment.Center),
         )
     }

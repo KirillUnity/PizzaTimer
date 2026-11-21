@@ -127,7 +127,7 @@ fun ViewModeNote(
     )
 }
 
-private fun viewModeLabel(mode: ViewMode): Int = when (mode) {
+internal fun viewModeLabel(mode: ViewMode): Int = when (mode) {
     ViewMode.DIAL -> R.string.view_mode_dial
     ViewMode.PIZZA -> R.string.view_mode_pizza
     ViewMode.PETALS -> R.string.view_mode_petals
@@ -151,9 +151,10 @@ private fun viewModeIcon(mode: ViewMode): ImageVector = when (mode) {
 private val ChromeChipHeight = 48.dp
 
 /**
- * Day shell controls: AM/PM, the four view modes, and the full hide-done label.
- * Chips keep a 48dp tap height and wrap onto another row instead of clipping.
+ * Rotation reset on the day face. AM/PM lives in the day header.
+ * View and hide-completed live in [DaySideMenu].
  *
+ * @param showHalves when true, AM/PM chips are offered here (the day header owns them)
  * @param quiet outline-only chips while a session is running
  * @since 0.5.0
  */
@@ -163,10 +164,6 @@ fun DayChromeRow(
     showHalves: Boolean,
     selectedHalf: DialHalf,
     onSelectHalf: (DialHalf) -> Unit,
-    selectedMode: ViewMode,
-    onSelectMode: (ViewMode) -> Unit,
-    hideCompleted: Boolean,
-    onToggleHideCompleted: () -> Unit,
     quiet: Boolean,
     resetEnabled: Boolean,
     onResetRotation: () -> Unit,
@@ -196,24 +193,6 @@ fun DayChromeRow(
                 )
             }
         }
-        ViewMode.entries.forEach { mode ->
-            val label = stringResource(viewModeLabel(mode))
-            ChromeChip(
-                label = label,
-                isSelected = selectedMode == mode,
-                quiet = quiet,
-                icon = viewModeIcon(mode),
-                contentDescription = stringResource(R.string.cd_view_mode, label),
-                onClick = { onSelectMode(mode) },
-            )
-        }
-        ChromeChip(
-            label = stringResource(R.string.day_hide_completed),
-            isSelected = hideCompleted,
-            quiet = quiet,
-            contentDescription = stringResource(R.string.cd_hide_completed),
-            onClick = onToggleHideCompleted,
-        )
         if (resetEnabled) {
             val resetDescription = stringResource(R.string.cd_reset_rotation)
             IconButton(
@@ -313,10 +292,6 @@ private fun DayChromeRowPreview() {
             showHalves = true,
             selectedHalf = DialHalf.AM,
             onSelectHalf = {},
-            selectedMode = ViewMode.DIAL,
-            onSelectMode = {},
-            hideCompleted = false,
-            onToggleHideCompleted = {},
             quiet = false,
             resetEnabled = false,
             onResetRotation = {},

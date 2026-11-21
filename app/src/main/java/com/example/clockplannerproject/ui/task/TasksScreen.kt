@@ -1,8 +1,11 @@
 package com.example.clockplannerproject.ui.task
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +31,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,7 +52,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
@@ -69,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.R
 import com.example.clockplannerproject.data.sample.SampleTasks
+import com.example.clockplannerproject.kit.core.GoalBook
 import com.example.clockplannerproject.kit.core.Importance
 import com.example.clockplannerproject.kit.core.RecurrenceRule
 import kotlinx.datetime.DayOfWeek
@@ -80,6 +89,7 @@ import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.taskAppearances
 import com.example.clockplannerproject.kit.core.time.TaskResize
+import com.example.clockplannerproject.kit.core.time.SessionDuration
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.time.epochMillisToLocalDate
 import com.example.clockplannerproject.kit.core.time.toEpochMillisAtStart
@@ -88,6 +98,7 @@ import com.example.clockplannerproject.ui.stats.ReportCard
 import com.example.clockplannerproject.ui.stats.rememberReportImportLaunchers
 import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 import com.example.clockplannerproject.ui.theme.PaperOutline
+import com.example.clockplannerproject.ui.theme.TerracottaNow
 import kotlinx.datetime.LocalDate
 import org.koin.androidx.compose.koinViewModel
 
@@ -150,8 +161,11 @@ fun TasksScreen(
     Box(modifier = modifier.fillMaxSize()) {
         ResponsiveTaskGrid(
             tasks = state.visibleTasks,
+            selectedIds = state.selectedTaskIds,
+            selecting = state.selectedTaskIds.isNotEmpty(),
             showEmpty = !state.isLoading && state.visibleTasks.isEmpty() && state.errorMessageRes == null,
             onEdit = { onIntent(TasksUiIntent.Edit(it)) },
+            onToggleSelect = { onIntent(TasksUiIntent.ToggleTaskSelection(it.id)) },
             header = {
                 PaperDateHeader(
                     date = state.date,
@@ -187,6 +201,17 @@ fun TasksScreen(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (state.selectedTaskIds.isNotEmpty()) {
+            TaskSelectionBar(
+                count = state.selectedTaskIds.size,
+                onDelete = { onIntent(TasksUiIntent.RequestDeleteSelected) },
+                onCancel = { onIntent(TasksUiIntent.ClearTaskSelection) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            )
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -201,8 +226,11 @@ fun TasksScreen(
 @Composable
 private fun ResponsiveTaskGrid(
     tasks: List<Task>,
+    selectedIds: Set<TaskId>,
+    selecting: Boolean,
     showEmpty: Boolean,
     onEdit: (Task) -> Unit,
+    onToggleSelect: (Task) -> Unit,
     header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -216,7 +244,9 @@ private fun ResponsiveTaskGrid(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                header()
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    header()
+                }
             }
             if (showEmpty) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -237,7 +267,10 @@ private fun ResponsiveTaskGrid(
                     TaskListRow(
                         task = row.task,
                         block = row.block,
+                        selected = row.task.id in selectedIds,
+                        selecting = selecting,
                         onEdit = { onEdit(row.task) },
+                        onToggleSelect = { onToggleSelect(row.task) },
                         modifier = Modifier.padding(horizontal = horizontalPadding),
                     )
                 }
@@ -246,11 +279,14 @@ private fun ResponsiveTaskGrid(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TaskListRow(
     task: Task,
+    selected: Boolean,
+    selecting: Boolean,
     onEdit: () -> Unit,
+    onToggleSelect: () -> Unit,
     modifier: Modifier = Modifier,
     block: TimeBlock? = task.blocks.firstOrNull(),
 ) {
@@ -259,6 +295,7 @@ private fun TaskListRow(
     val importanceText = stringResource(importanceLabel(task.importance))
     val statusCd = stringResource(R.string.cd_status_chip, statusText)
     val importanceCd = stringResource(R.string.cd_importance_chip, importanceText)
+    val selectedCd = stringResource(R.string.cd_task_selected)
     val whenText = if (block == null) {
         stringResource(R.string.task_row_untimed)
     } else {
@@ -270,11 +307,21 @@ private fun TaskListRow(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, PaperOutline, shape)
-            .clickable(onClick = onEdit)
+            .border(if (selected) 2.dp else 1.dp, if (selected) TerracottaNow else PaperOutline, shape)
+            .combinedClickable(
+                onClick = { if (selecting) onToggleSelect() else onEdit() },
+                onLongClick = onToggleSelect,
+            )
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selecting) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggleSelect() },
+                    modifier = Modifier.semantics { contentDescription = selectedCd },
+                )
+            }
             Box(
                 modifier = Modifier
                     .size(width = 4.dp, height = 36.dp)
@@ -333,6 +380,36 @@ private fun TaskListRow(
     }
 }
 
+@Composable
+private fun TaskSelectionBar(
+    count: Int,
+    onDelete: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, PaperOutline, RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.task_select_count, count),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onDelete, modifier = Modifier.height(48.dp)) {
+            Text(stringResource(R.string.task_delete))
+        }
+        TextButton(onClick = onCancel, modifier = Modifier.height(48.dp)) {
+            Text(stringResource(R.string.task_delete_cancel))
+        }
+    }
+}
+
 /**
  * Editor sheet, time picker, delete confirm, and date picker.
  * Hosted at the app root so the center Create FAB works on every tab.
@@ -352,29 +429,86 @@ fun TaskEditorOverlays(
                 editor = editor,
                 nowMinute = state.nowMinute,
                 reports = state.reports,
+                commentBlockId = state.commentBlockId,
                 reportDraft = state.reportDraft,
                 knownTags = state.availableTags,
+                goals = state.goals,
                 onIntent = onIntent,
             )
         }
     }
 
-    state.pendingDelete?.let { task ->
-        AlertDialog(
-            onDismissRequest = { onIntent(TasksUiIntent.DismissDelete) },
-            title = { Text(stringResource(R.string.task_delete_title)) },
-            text = { Text(stringResource(R.string.task_delete_body, task.title)) },
-            confirmButton = {
-                TextButton(onClick = { onIntent(TasksUiIntent.ConfirmDelete) }) {
-                    Text(stringResource(R.string.task_delete_confirm))
+    val bulkCount = state.selectedTaskIds.size
+    when {
+        state.pendingDelete != null -> {
+            val task = state.pendingDelete
+            AlertDialog(
+                onDismissRequest = { onIntent(TasksUiIntent.DismissDelete) },
+                title = { Text(stringResource(R.string.task_delete_title)) },
+                text = { Text(stringResource(R.string.task_delete_body, task.title)) },
+                confirmButton = {
+                    TextButton(onClick = { onIntent(TasksUiIntent.ConfirmDelete) }) {
+                        Text(stringResource(R.string.task_delete_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { onIntent(TasksUiIntent.DismissDelete) }) {
+                        Text(stringResource(R.string.task_delete_cancel))
+                    }
+                },
+            )
+        }
+        state.pendingBulkDelete && bulkCount > 0 -> {
+            AlertDialog(
+                onDismissRequest = { onIntent(TasksUiIntent.DismissDelete) },
+                title = { Text(stringResource(R.string.task_delete_many_title)) },
+                text = { Text(stringResource(R.string.task_delete_many_body, bulkCount)) },
+                confirmButton = {
+                    TextButton(onClick = { onIntent(TasksUiIntent.ConfirmDelete) }) {
+                        Text(stringResource(R.string.task_delete_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { onIntent(TasksUiIntent.DismissDelete) }) {
+                        Text(stringResource(R.string.task_delete_cancel))
+                    }
+                },
+            )
+        }
+    }
+
+    state.timePicker?.let { target ->
+        val editor = state.editor ?: return@let
+        val block = editor.blocks.getOrNull(target.blockIndex) ?: return@let
+        val minute = if (target.isStart) {
+            block.startMinute
+        } else {
+            block.endMinute ?: block.startMinute
+        }
+        IntervalTimeDialog(
+            minuteOfDay = minute,
+            onConfirm = { picked ->
+                if (target.isStart) {
+                    onIntent(TasksUiIntent.ChangeBlockStart(target.blockIndex, picked))
+                } else {
+                    onIntent(TasksUiIntent.ChangeBlockEnd(target.blockIndex, picked))
                 }
+                onIntent(TasksUiIntent.DismissTimePicker)
             },
-            dismissButton = {
-                TextButton(onClick = { onIntent(TasksUiIntent.DismissDelete) }) {
-                    Text(stringResource(R.string.task_delete_cancel))
-                }
-            },
+            onDismiss = { onIntent(TasksUiIntent.DismissTimePicker) },
         )
+    }
+
+    if (state.showIntervalDatePicker) {
+        val editor = state.editor
+        val selected = editor?.intervalDate ?: editor?.scheduledDate ?: state.date
+        if (editor != null && selected != null) {
+            TaskDatePickerDialog(
+                selectedDate = selected,
+                onConfirm = { onIntent(TasksUiIntent.SelectIntervalDate(it)) },
+                onDismiss = { onIntent(TasksUiIntent.DismissIntervalDatePicker) },
+            )
+        }
     }
 
     if (state.showDatePicker && state.date != null) {
@@ -438,8 +572,10 @@ private fun TaskEditorSheet(
     editor: TaskEditorState,
     nowMinute: Int,
     reports: List<com.example.clockplannerproject.kit.core.TaskReport> = emptyList(),
+    commentBlockId: String? = null,
     reportDraft: String = "",
     knownTags: List<String> = emptyList(),
+    goals: GoalBook = GoalBook(),
     onIntent: (TasksUiIntent) -> Unit,
 ) {
     val launchers = rememberReportImportLaunchers { id, uri ->
@@ -450,6 +586,15 @@ private fun TaskEditorSheet(
         onDismissRequest = { onIntent(TasksUiIntent.DismissEditor) },
         sheetState = sheetState,
     ) {
+        if (editor.isNew && editor.createStage != null) {
+            TaskCreateFlow(
+                editor = editor,
+                nowMinute = nowMinute,
+                knownTags = knownTags,
+                onIntent = onIntent,
+            )
+            return@ModalBottomSheet
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -467,224 +612,265 @@ private fun TaskEditorSheet(
                 text = stringResource(R.string.task_editor_title),
                 style = MaterialTheme.typography.titleLarge,
             )
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = editor.title,
-                onValueChange = { onIntent(TasksUiIntent.ChangeTitle(it)) },
-                label = { Text(stringResource(R.string.task_title)) },
-                isError = editor.error is TaskDraftError.EmptyTitle,
-                supportingText = {
-                    if (editor.error is TaskDraftError.EmptyTitle) {
-                        Text(stringResource(R.string.task_error_empty_title))
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = editor.description,
-                onValueChange = { onIntent(TasksUiIntent.ChangeDescription(it)) },
-                label = { Text(stringResource(R.string.task_description)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.task_color),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TaskPalette.colors.forEach { color ->
-                    val selected = color == editor.colorArgb
-                    val swatchCd = stringResource(R.string.cd_palette_swatch)
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color(color.toInt()))
-                            .then(
-                                if (selected) {
-                                    Modifier.border(
-                                        3.dp,
-                                        MaterialTheme.colorScheme.onSurface,
-                                        CircleShape,
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .clickable { onIntent(TasksUiIntent.ChangeColor(color)) }
-                            .semantics { contentDescription = swatchCd },
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            ImportanceRow(
-                selected = editor.importance,
-                onSelect = { onIntent(TasksUiIntent.ChangeImportance(it)) },
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = editor.project,
-                onValueChange = { onIntent(TasksUiIntent.ChangeProject(it)) },
-                label = { Text(stringResource(R.string.task_project)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(12.dp))
-            TagEditor(
-                tags = editor.tags,
-                draft = editor.tagDraft,
-                knownTags = knownTags,
-                onDraft = { onIntent(TasksUiIntent.ChangeTagDraft(it)) },
-                onAdd = { onIntent(TasksUiIntent.AddTag(it)) },
-                onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
-            )
-            Spacer(Modifier.height(12.dp))
-            FilterChip(
-                selected = editor.scheduledDate == null,
-                onClick = {
-                    onIntent(TasksUiIntent.ChangeScheduled(editor.scheduledDate == null))
-                },
-                label = { Text(stringResource(R.string.task_backlog_toggle)) },
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.task_status),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TaskStatus.entries.forEach { status ->
-                    FilterChip(
-                        selected = editor.status == status,
-                        onClick = { onIntent(TasksUiIntent.ChangeStatus(status)) },
-                        label = { Text(stringResource(statusLabel(status))) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            if (editor.blocks.isEmpty()) {
+            if (editor.title.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.task_untimed_hint),
+                    text = editor.title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
-                Text(
-                    text = stringResource(R.string.task_intervals),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                editor.blocks.forEachIndexed { index, block ->
-                    val closed = block.isClosed(nowMinute)
-                    val end = block.endMinute
-                    IntervalRow(
-                        block = block,
-                        readOnly = closed,
-                        overnight = end != null &&
-                            end != TimeMath.MINUTES_PER_DAY &&
-                            end.mod(TimeMath.MINUTES_PER_DAY) <
-                            block.startMinute.mod(TimeMath.MINUTES_PER_DAY),
-                        onEndEarlier = {
-                            onIntent(
-                                TasksUiIntent.ChangeBlockEnd(
-                                    index,
-                                    endAfterStep(block, -EndStepMinutes),
-                                ),
-                            )
-                        },
-                        onEndLater = {
-                            onIntent(
-                                TasksUiIntent.ChangeBlockEnd(
-                                    index,
-                                    endAfterStep(block, EndStepMinutes),
-                                ),
-                            )
-                        },
-                    )
-                }
             }
-            if (editor.error is TaskDraftError.EndEqualsStart) {
-                Text(
-                    text = stringResource(R.string.task_error_end_equals_start),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            TextButton(
-                onClick = { onIntent(TasksUiIntent.AddBlock) },
-                modifier = Modifier.height(48.dp),
+            Spacer(Modifier.height(8.dp))
+            EditorMenuSection(
+                title = stringResource(R.string.task_create_name_title),
+                expanded = EditSection.NAME in editor.expandedEditSections,
+                onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.NAME)) },
             ) {
-                Text(stringResource(R.string.task_add_interval))
-            }
-            if (editor.scheduledDate != null) {
-                Spacer(Modifier.height(8.dp))
-                RecurrenceEditor(
-                    rule = editor.recurrence,
-                    onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
-                )
-            }
-            if (!editor.isNew) {
-                Spacer(Modifier.height(8.dp))
-                EditorAction(
-                    label = stringResource(
-                        if (editor.scheduledDate == null) {
-                            R.string.task_move_to_diagram
-                        } else {
-                            R.string.task_move
-                        },
-                    ),
-                    onClick = {
-                        val task = editor.toTask()
-                        if (task.date == null) {
-                            onIntent(TasksUiIntent.MoveToDiagram(task))
-                        } else {
-                            onIntent(TasksUiIntent.RequestMove(task))
+                OutlinedTextField(
+                    value = editor.title,
+                    onValueChange = { onIntent(TasksUiIntent.ChangeTitle(it)) },
+                    label = { Text(stringResource(R.string.task_title)) },
+                    isError = editor.error is TaskDraftError.EmptyTitle,
+                    supportingText = {
+                        if (editor.error is TaskDraftError.EmptyTitle) {
+                            Text(stringResource(R.string.task_error_empty_title))
                         }
                     },
-                )
-                EditorAction(
-                    label = stringResource(R.string.task_duplicate),
-                    onClick = { onIntent(TasksUiIntent.Duplicate(editor.toTask())) },
-                )
-                EditorAction(
-                    label = stringResource(R.string.task_delete),
-                    onClick = { onIntent(TasksUiIntent.Delete(editor.toTask())) },
-                    destructive = true,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.task_reports),
-                    style = MaterialTheme.typography.labelLarge,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = reportDraft,
-                    onValueChange = { onIntent(TasksUiIntent.ChangeReportDraft(it)) },
-                    label = { Text(stringResource(R.string.report_hint)) },
+                    value = editor.description,
+                    onValueChange = { onIntent(TasksUiIntent.ChangeDescription(it)) },
+                    label = { Text(stringResource(R.string.task_description)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                 )
-                TextButton(onClick = { onIntent(TasksUiIntent.SaveReport) }) {
-                    Text(stringResource(R.string.report_save))
+            }
+            EditorMenuSection(
+                title = stringResource(R.string.task_create_when_title),
+                expanded = EditSection.WHEN in editor.expandedEditSections,
+                onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.WHEN)) },
+            ) {
+                FilterChip(
+                    selected = editor.scheduledDate == null,
+                    onClick = {
+                        onIntent(TasksUiIntent.ChangeScheduled(editor.scheduledDate == null))
+                    },
+                    label = { Text(stringResource(R.string.task_backlog_toggle)) },
+                )
+                Spacer(Modifier.height(12.dp))
+                IntervalEditorBody(
+                    editor = editor,
+                    nowMinute = nowMinute,
+                    onIntent = onIntent,
+                )
+                if (editor.scheduledDate != null) {
+                    RecurrenceEditor(
+                        rule = editor.recurrence,
+                        onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+                    )
                 }
-                reports.forEach { report ->
-                    ReportCard(
-                        report = report,
-                        onClick = { onIntent(TasksUiIntent.EditReport(report)) },
-                        onPickImage = { launchers.pickImage(report.id) },
-                        onPickFile = { launchers.pickFile(report.id) },
-                        onRemoveAttachment = {
-                            onIntent(TasksUiIntent.RemoveReportAttachment(report.id))
+            }
+            EditorMenuSection(
+                title = stringResource(R.string.task_create_look_title),
+                expanded = EditSection.LOOK in editor.expandedEditSections,
+                onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.LOOK)) },
+            ) {
+                Text(
+                    text = stringResource(R.string.task_color),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TaskPalette.colors.forEach { color ->
+                        val selected = color == editor.colorArgb
+                        val swatchCd = stringResource(R.string.cd_palette_swatch)
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(color.toInt()))
+                                .then(
+                                    if (selected) {
+                                        Modifier.border(
+                                            3.dp,
+                                            MaterialTheme.colorScheme.onSurface,
+                                            CircleShape,
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .clickable { onIntent(TasksUiIntent.ChangeColor(color)) }
+                                .semantics { contentDescription = swatchCd },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                ImportanceRow(
+                    selected = editor.importance,
+                    onSelect = { onIntent(TasksUiIntent.ChangeImportance(it)) },
+                )
+            }
+            EditorMenuSection(
+                title = stringResource(R.string.task_create_details_title),
+                expanded = EditSection.DETAILS in editor.expandedEditSections,
+                onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.DETAILS)) },
+            ) {
+                OutlinedTextField(
+                    value = editor.project,
+                    onValueChange = { onIntent(TasksUiIntent.ChangeProject(it)) },
+                    label = { Text(stringResource(R.string.task_project)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                TagEditor(
+                    tags = editor.tags,
+                    draft = editor.tagDraft,
+                    knownTags = knownTags,
+                    onDraft = { onIntent(TasksUiIntent.ChangeTagDraft(it)) },
+                    onAdd = { onIntent(TasksUiIntent.AddTag(it)) },
+                    onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.task_status),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    TaskStatus.entries.forEach { status ->
+                        FilterChip(
+                            selected = editor.status == status,
+                            onClick = { onIntent(TasksUiIntent.ChangeStatus(status)) },
+                            label = { Text(stringResource(statusLabel(status))) },
+                        )
+                    }
+                }
+            }
+            if (editor.id != null && goals.intermediate.isNotEmpty()) {
+                EditorMenuSection(
+                    title = stringResource(R.string.goals_link),
+                    expanded = EditSection.GOALS in editor.expandedEditSections,
+                    onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.GOALS)) },
+                ) {
+                    if (editor.blocks.isEmpty()) {
+                        TextButton(onClick = { onIntent(TasksUiIntent.LinkIntermediate(null)) }) {
+                            Text(stringResource(R.string.goals_unlink))
+                        }
+                        goals.intermediate.forEach { goal ->
+                            val selected = goals.taskLinks[editor.id.value] == goal.id
+                            TextButton(onClick = { onIntent(TasksUiIntent.LinkIntermediate(goal.id)) }) {
+                                Text(if (selected) "• ${goal.title}" else goal.title)
+                            }
+                        }
+                    } else {
+                        editor.blocks.forEach { block ->
+                            val key = com.example.clockplannerproject.kit.core.GoalBook.intervalKey(
+                                editor.id.value,
+                                block.id,
+                            )
+                            Text(
+                                text = TimeMath.formatRange(block.startMinute, block.endMinute),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            TextButton(onClick = { onIntent(TasksUiIntent.LinkInterval(block.id, null)) }) {
+                                Text(stringResource(R.string.goals_unlink))
+                            }
+                            goals.intermediate.forEach { goal ->
+                                val selected = goals.taskLinks[key] == goal.id
+                                TextButton(onClick = {
+                                    onIntent(TasksUiIntent.LinkInterval(block.id, goal.id))
+                                }) {
+                                    Text(if (selected) "• ${goal.title}" else goal.title)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!editor.isNew) {
+                EditorMenuSection(
+                    title = stringResource(R.string.task_reports),
+                    expanded = EditSection.REPORTS in editor.expandedEditSections,
+                    onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.REPORTS)) },
+                ) {
+                    if (editor.blocks.size > 1) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            editor.blocks.forEach { block ->
+                                FilterChip(
+                                    selected = commentBlockId == block.id,
+                                    onClick = { onIntent(TasksUiIntent.SelectCommentInterval(block.id)) },
+                                    label = {
+                                        Text(TimeMath.formatRange(block.startMinute, block.endMinute))
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = reportDraft,
+                        onValueChange = { onIntent(TasksUiIntent.ChangeReportDraft(it)) },
+                        label = { Text(stringResource(R.string.report_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                    )
+                    TextButton(onClick = { onIntent(TasksUiIntent.SaveReport) }) {
+                        Text(stringResource(R.string.report_save))
+                    }
+                    reports.filter { report ->
+                        commentBlockId == null || report.blockId == commentBlockId
+                    }.forEach { report ->
+                        ReportCard(
+                            report = report,
+                            onClick = { onIntent(TasksUiIntent.EditReport(report)) },
+                            onPickImage = { launchers.pickImage(report.id) },
+                            onPickFile = { launchers.pickFile(report.id) },
+                            onRemoveAttachment = {
+                                onIntent(TasksUiIntent.RemoveReportAttachment(report.id))
+                            },
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+                EditorMenuSection(
+                    title = stringResource(R.string.task_edit_actions),
+                    expanded = EditSection.ACTIONS in editor.expandedEditSections,
+                    onToggle = { onIntent(TasksUiIntent.ToggleEditSection(EditSection.ACTIONS)) },
+                ) {
+                    EditorAction(
+                        label = stringResource(
+                            if (editor.scheduledDate == null) {
+                                R.string.task_move_to_diagram
+                            } else {
+                                R.string.task_move
+                            },
+                        ),
+                        onClick = {
+                            val task = editor.toTask()
+                            if (task.date == null) {
+                                onIntent(TasksUiIntent.MoveToDiagram(task))
+                            } else {
+                                onIntent(TasksUiIntent.RequestMove(task))
+                            }
                         },
-                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                    EditorAction(
+                        label = stringResource(R.string.task_duplicate),
+                        onClick = { onIntent(TasksUiIntent.Duplicate(editor.toTask())) },
+                    )
+                    EditorAction(
+                        label = stringResource(R.string.task_delete),
+                        onClick = { onIntent(TasksUiIntent.Delete(editor.toTask())) },
+                        destructive = true,
                     )
                 }
             }
@@ -702,6 +888,277 @@ private fun TaskEditorSheet(
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TaskCreateFlow(
+    editor: TaskEditorState,
+    nowMinute: Int,
+    knownTags: List<String>,
+    onIntent: (TasksUiIntent) -> Unit,
+) {
+    val fallbackTitle = stringResource(R.string.task_quick_today_title)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp),
+    ) {
+        when (editor.createStage) {
+            CreateStage.CHOOSER, null -> CreateChooser(
+                title = editor.title,
+                onTitle = { onIntent(TasksUiIntent.ChangeTitle(it)) },
+                onToday = { onIntent(TasksUiIntent.CreateTodayQuick(fallbackTitle)) },
+                onConfigure = { onIntent(TasksUiIntent.StartCreateWizard) },
+            )
+            else -> {
+                val stage = editor.createStage
+                val last = stage == CreateStage.DETAILS
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        text = stringResource(createStageTitle(stage)),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(createStageBody(stage)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    when (stage) {
+                        CreateStage.NAME -> {
+                            OutlinedTextField(
+                                value = editor.title,
+                                onValueChange = { onIntent(TasksUiIntent.ChangeTitle(it)) },
+                                label = { Text(stringResource(R.string.task_title)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editor.description,
+                                onValueChange = { onIntent(TasksUiIntent.ChangeDescription(it)) },
+                                label = { Text(stringResource(R.string.task_description)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                            )
+                        }
+                        CreateStage.WHEN -> {
+                            IntervalEditorBody(
+                                editor = editor,
+                                nowMinute = nowMinute,
+                                onIntent = onIntent,
+                            )
+                            if (editor.scheduledDate != null) {
+                                RecurrenceEditor(
+                                    rule = editor.recurrence,
+                                    onChange = { onIntent(TasksUiIntent.ChangeRecurrence(it)) },
+                                )
+                            }
+                        }
+                        CreateStage.LOOK -> {
+                            Text(
+                                text = stringResource(R.string.task_color),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                TaskPalette.colors.forEach { color ->
+                                    val selected = color == editor.colorArgb
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(color.toInt()))
+                                            .then(
+                                                if (selected) {
+                                                    Modifier.border(
+                                                        3.dp,
+                                                        MaterialTheme.colorScheme.onSurface,
+                                                        CircleShape,
+                                                    )
+                                                } else {
+                                                    Modifier
+                                                },
+                                            )
+                                            .clickable { onIntent(TasksUiIntent.ChangeColor(color)) },
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            ImportanceRow(
+                                selected = editor.importance,
+                                onSelect = { onIntent(TasksUiIntent.ChangeImportance(it)) },
+                            )
+                        }
+                        CreateStage.DETAILS -> {
+                            OutlinedTextField(
+                                value = editor.project,
+                                onValueChange = { onIntent(TasksUiIntent.ChangeProject(it)) },
+                                label = { Text(stringResource(R.string.task_project)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            TagEditor(
+                                tags = editor.tags,
+                                draft = editor.tagDraft,
+                                knownTags = knownTags,
+                                onDraft = { onIntent(TasksUiIntent.ChangeTagDraft(it)) },
+                                onAdd = { onIntent(TasksUiIntent.AddTag(it)) },
+                                onRemove = { onIntent(TasksUiIntent.RemoveTag(it)) },
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            FilterChip(
+                                selected = editor.scheduledDate == null,
+                                onClick = {
+                                    onIntent(
+                                        TasksUiIntent.ChangeScheduled(editor.scheduledDate == null),
+                                    )
+                                },
+                                label = { Text(stringResource(R.string.task_backlog_toggle)) },
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.task_status),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                TaskStatus.entries.forEach { status ->
+                                    FilterChip(
+                                        selected = editor.status == status,
+                                        onClick = { onIntent(TasksUiIntent.ChangeStatus(status)) },
+                                        label = { Text(stringResource(statusLabel(status))) },
+                                    )
+                                }
+                            }
+                        }
+                        else -> Unit
+                    }
+                    if (editor.error is TaskDraftError.EmptyTitle) {
+                        Text(
+                            text = stringResource(R.string.task_error_empty_title),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { onIntent(TasksUiIntent.CreateBackStage) }) {
+                        Text(stringResource(R.string.task_create_back))
+                    }
+                    TextButton(
+                        onClick = {
+                            if (last) {
+                                onIntent(TasksUiIntent.CreateFinishWizard(fallbackTitle))
+                            } else {
+                                onIntent(TasksUiIntent.CreateSkipStage)
+                            }
+                        },
+                    ) {
+                        Text(stringResource(R.string.task_create_skip))
+                    }
+                    Button(
+                        onClick = {
+                            if (last) {
+                                onIntent(TasksUiIntent.CreateFinishWizard(fallbackTitle))
+                            } else {
+                                onIntent(TasksUiIntent.CreateNextStage)
+                            }
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (last) R.string.task_save else R.string.task_create_next,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateChooser(
+    title: String,
+    onTitle: (String) -> Unit,
+    onToday: () -> Unit,
+    onConfigure: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)) {
+        Text(
+            text = stringResource(R.string.task_create_chooser_title),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.task_create_chooser_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(
+            value = title,
+            onValueChange = onTitle,
+            label = { Text(stringResource(R.string.task_title)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onToday,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+        ) {
+            Text(stringResource(R.string.task_create_today))
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(
+            onClick = onConfigure,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+        ) {
+            Text(stringResource(R.string.task_create_configure))
+        }
+    }
+}
+
+private fun createStageTitle(stage: CreateStage?): Int = when (stage) {
+    CreateStage.NAME -> R.string.task_create_name_title
+    CreateStage.WHEN -> R.string.task_create_when_title
+    CreateStage.LOOK -> R.string.task_create_look_title
+    CreateStage.DETAILS -> R.string.task_create_details_title
+    else -> R.string.task_create_chooser_title
+}
+
+private fun createStageBody(stage: CreateStage?): Int = when (stage) {
+    CreateStage.NAME -> R.string.task_create_name_body
+    CreateStage.WHEN -> R.string.task_create_when_body
+    CreateStage.LOOK -> R.string.task_create_look_body
+    CreateStage.DETAILS -> R.string.task_create_details_body
+    else -> R.string.task_create_chooser_body
 }
 
 @Composable
@@ -886,6 +1343,40 @@ private fun ImportanceRow(
 }
 
 @Composable
+private fun EditorMenuSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier.rotate(if (expanded) 90f else 0f),
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditorAction(
     label: String,
     onClick: () -> Unit,
@@ -910,56 +1401,201 @@ private fun EditorAction(
     }
 }
 
+@Composable
+private fun IntervalEditorBody(
+    editor: TaskEditorState,
+    nowMinute: Int,
+    onIntent: (TasksUiIntent) -> Unit,
+) {
+    val needsDate = editor.recurrence !is RecurrenceRule.None
+    if (needsDate && editor.intervalDate == null) {
+        Text(
+            text = stringResource(R.string.task_interval_date_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
+            onClick = { onIntent(TasksUiIntent.OpenIntervalDatePicker) },
+            modifier = Modifier.height(48.dp),
+        ) {
+            Text(stringResource(R.string.task_interval_pick_date))
+        }
+        return
+    }
+    if (needsDate) {
+        TextButton(
+            onClick = { onIntent(TasksUiIntent.OpenIntervalDatePicker) },
+            modifier = Modifier.height(48.dp),
+        ) {
+            Text(stringResource(R.string.task_interval_date_chosen, editor.intervalDate.toString()))
+        }
+    }
+    if (editor.blocks.isEmpty()) {
+        Text(
+            text = stringResource(R.string.task_untimed_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        Text(
+            text = stringResource(R.string.task_intervals),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        IntervalEditorList(
+            blocks = editor.blocks,
+            nowMinute = nowMinute,
+            onIntent = onIntent,
+        )
+    }
+    IntervalError(error = editor.error)
+    TextButton(
+        onClick = { onIntent(TasksUiIntent.AddBlock) },
+        modifier = Modifier.height(48.dp),
+    ) {
+        Text(stringResource(R.string.task_add_interval))
+    }
+}
+
+@Composable
+private fun IntervalEditorList(
+    blocks: List<TimeBlock>,
+    nowMinute: Int,
+    onIntent: (TasksUiIntent) -> Unit,
+) {
+    blocks.forEachIndexed { index, block ->
+        val end = block.endMinute
+        IntervalRow(
+            block = block,
+            nowMinute = nowMinute,
+            overnight = end != null &&
+                end != TimeMath.MINUTES_PER_DAY &&
+                end.mod(TimeMath.MINUTES_PER_DAY) <
+                block.startMinute.mod(TimeMath.MINUTES_PER_DAY),
+            onEditStart = { onIntent(TasksUiIntent.OpenStartPicker(index)) },
+            onEditEnd = { onIntent(TasksUiIntent.OpenEndPicker(index)) },
+            onEndEarlier = {
+                onIntent(TasksUiIntent.ChangeBlockEnd(index, endAfterStep(block, -EndStepMinutes)))
+            },
+            onEndLater = {
+                onIntent(TasksUiIntent.ChangeBlockEnd(index, endAfterStep(block, EndStepMinutes)))
+            },
+            onPlannedLess = {
+                val current = block.plannedMinutes ?: block.actualMinutes(nowMinute)
+                onIntent(
+                    TasksUiIntent.ChangePlannedMinutes(index, SessionDuration.step(current, -1)),
+                )
+            },
+            onPlannedMore = {
+                val current = block.plannedMinutes ?: block.actualMinutes(nowMinute)
+                onIntent(
+                    TasksUiIntent.ChangePlannedMinutes(index, SessionDuration.step(current, 1)),
+                )
+            },
+            onRemove = { onIntent(TasksUiIntent.RemoveBlock(index)) },
+        )
+    }
+}
+
+@Composable
+private fun IntervalError(error: TaskDraftError?) {
+    val message = when (error) {
+        TaskDraftError.EndEqualsStart -> R.string.task_error_end_equals_start
+        TaskDraftError.OverlappingPeriod -> R.string.task_error_overlap
+        else -> null
+    } ?: return
+    Text(
+        text = stringResource(message),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IntervalTimeDialog(
+    minuteOfDay: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val normalized = minuteOfDay.mod(TimeMath.MINUTES_PER_DAY)
+    val pickerState = rememberTimePickerState(
+        initialHour = normalized / 60,
+        initialMinute = normalized % 60,
+        is24Hour = true,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pickerState.hour * 60 + pickerState.minute) }) {
+                Text(stringResource(R.string.task_picker_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.task_picker_cancel))
+            }
+        },
+        text = { TimePicker(state = pickerState) },
+    )
+}
+
 /**
- * One civil segment. A closed block is text and a lock only.
- * An open block can move its end in [EndStepMinutes] steps.
+ * One civil segment. Start, end, and the interval itself can be changed
+ * after the interval has ended. Expected minutes stay put when the clock range changes.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntervalRow(
     block: TimeBlock,
-    readOnly: Boolean,
+    nowMinute: Int,
     overnight: Boolean,
+    onEditStart: () -> Unit,
+    onEditEnd: () -> Unit,
     onEndEarlier: () -> Unit,
     onEndLater: () -> Unit,
+    onPlannedLess: () -> Unit,
+    onPlannedMore: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val range = TimeMath.formatRange(block.startMinute, block.endMinute)
+    val expected = block.plannedMinutes ?: block.actualMinutes(nowMinute)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (readOnly) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        Text(
+            text = range,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.clickable(onClick = onEditStart),
+        )
+        Text(
+            text = stringResource(R.string.task_interval_expected, expected),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.task_interval_actual, block.actualMinutes(nowMinute)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onEditStart, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_edit_start))
             }
-            Text(
-                text = range,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-        if (readOnly) {
-            Text(
-                text = stringResource(R.string.task_interval_locked),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = onEndEarlier,
-                    modifier = Modifier.height(48.dp),
-                ) {
-                    Text(stringResource(R.string.task_end_earlier))
-                }
-                TextButton(
-                    onClick = onEndLater,
-                    modifier = Modifier.height(48.dp),
-                ) {
-                    Text(stringResource(R.string.task_end_later))
-                }
+            TextButton(onClick = onEditEnd, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_edit_end))
+            }
+            TextButton(onClick = onEndEarlier, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_end_earlier))
+            }
+            TextButton(onClick = onEndLater, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_end_later))
+            }
+            TextButton(onClick = onPlannedLess, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_interval_expected_less))
+            }
+            TextButton(onClick = onPlannedMore, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_interval_expected_more))
+            }
+            TextButton(onClick = onRemove, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.task_remove_interval))
             }
         }
         if (overnight) {

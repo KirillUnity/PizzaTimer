@@ -37,7 +37,13 @@ object TimeDialRenderer : DialRenderer {
         ring: RingLayout,
         geometry: GeometryConfig,
         paint: AndroidPaint,
-    ): List<PreparedArcLabel> = prepareArcLabels(sectors, ring, geometry, paint)
+    ): List<PreparedArcLabel> = prepareArcLabels(
+        sectors,
+        ring,
+        geometry,
+        paint,
+        radius = ring.bandCenterRadius,
+    )
 
     override fun prepareExtras(
         sectors: List<PreparedSector>,
@@ -116,7 +122,8 @@ object TimeDialRenderer : DialRenderer {
     }
 
     /**
-     * Draws tangent titles at sector midpoints. [paint] is cached.
+     * Draws titles along each sector arc. [paint] is cached. Paths come from
+     * [prepareArcLabels]; this loop must not allocate.
      */
     fun DrawScope.renderArcLabels(
         labels: List<PreparedArcLabel>,
@@ -126,11 +133,24 @@ object TimeDialRenderer : DialRenderer {
         drawContext.canvas.nativeCanvas.let { native ->
             labels.forEach { label ->
                 paint.color = label.colorArgb
-                native.save()
-                native.translate(label.x, label.y)
-                native.rotate(label.rotationDeg)
-                native.drawText(label.text, 0f, label.vOffset, paint)
-                native.restore()
+                if (!label.path.isEmpty) {
+                    val previousAlign = paint.textAlign
+                    paint.textAlign = AndroidPaint.Align.LEFT
+                    native.drawTextOnPath(
+                        label.text,
+                        label.path,
+                        label.hOffset,
+                        label.vOffset,
+                        paint,
+                    )
+                    paint.textAlign = previousAlign
+                } else {
+                    native.save()
+                    native.translate(label.x, label.y)
+                    native.rotate(label.rotationDeg)
+                    native.drawText(label.text, 0f, label.vOffset, paint)
+                    native.restore()
+                }
             }
         }
     }

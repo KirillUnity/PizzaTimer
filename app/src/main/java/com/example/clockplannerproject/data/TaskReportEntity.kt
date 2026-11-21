@@ -36,6 +36,7 @@ data class TaskReportEntity(
     val attachmentRelativePath: String? = null,
     val attachmentDisplayName: String? = null,
     val attachmentMimeType: String? = null,
+    val blockId: String? = null,
 )
 
 fun TaskReportEntity.toDomain(): TaskReport = TaskReport(
@@ -44,6 +45,7 @@ fun TaskReportEntity.toDomain(): TaskReport = TaskReport(
     createdAtEpochMillis = createdAtEpochMillis,
     text = text,
     attachment = attachmentOrNull(),
+    blockId = blockId,
 )
 
 fun TaskReport.toEntity(): TaskReportEntity = TaskReportEntity(
@@ -54,6 +56,7 @@ fun TaskReport.toEntity(): TaskReportEntity = TaskReportEntity(
     attachmentRelativePath = attachment?.relativePath,
     attachmentDisplayName = attachment?.displayName,
     attachmentMimeType = attachment?.mimeType,
+    blockId = blockId,
 )
 
 private fun TaskReportEntity.attachmentOrNull(): ReportAttachment? {

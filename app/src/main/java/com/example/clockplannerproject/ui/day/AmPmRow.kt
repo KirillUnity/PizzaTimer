@@ -20,7 +20,10 @@ import com.example.clockplannerproject.ui.theme.ClockPlannerProjectTheme
 
 /**
  * AM / PM face switcher for the 12-hour rings.
+ * Visible copy is `dial_am` / `dial_pm` (AM and PM). TalkBack uses `cd_half_am` / `cd_half_pm`.
  *
+ * @param selected face currently shown
+ * @param onSelect called with the face the user picked; stored task minutes stay unchanged
  * @since 0.5.0
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +53,7 @@ fun AmPmRow(
                 Text(
                     text = label,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Clip,
                     softWrap = false,
                 )
             }

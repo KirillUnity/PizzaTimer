@@ -35,6 +35,8 @@ class RecurrenceMaterializerTest {
         assertEquals("Standup", items.single { it.date == tuesday }.title)
         assertEquals("daily", items.single { it.date == tuesday }.seriesId)
         assertEquals(RecurrenceRule.None, items.single { it.date == tuesday }.recurrence)
+        assertEquals(emptyList<TimeBlock>(), items.single { it.date == tuesday }.blocks)
+        assertEquals(template.blocks, items.single { it.date == monday }.blocks)
         assertEquals(1, items.count { it.date == monday })
         materializer.ensureVisibleDay(tuesday)
         assertEquals(2, repo.all().size)

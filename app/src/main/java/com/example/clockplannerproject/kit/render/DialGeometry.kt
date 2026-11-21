@@ -22,7 +22,17 @@ data class RingLayout(
     val midRadius: Float,
     val innerRadius: Float,
     val outerRadius: Float,
-)
+) {
+    /**
+     * Middle of the painted dial band. `drawArc` centers its stroke on the
+     * oval of [outerRadius], so the ink runs from [midRadius] out to
+     * [outerRadius] plus half of [thickness]. Sector titles use this radius
+     * so glyphs stay on the ring.
+     *
+     * @since 1.2.0
+     */
+    val bandCenterRadius: Float get() = outerRadius
+}
 
 data class PreparedSector(
     val canvasStartDeg: Float,

@@ -33,4 +33,13 @@ class TimeBlockTest {
         assertTrue(sleep.isClosed(7 * 60))
         assertFalse(sleep.isClosed(22 * 60))
     }
+
+    @Test
+    fun overlaps_sameMinutes() {
+        val first = TimeBlock(9 * 60, 10 * 60)
+        val copy = TimeBlock(9 * 60, 10 * 60)
+        val after = TimeBlock(10 * 60, 11 * 60)
+        assertTrue(first.overlaps(copy))
+        assertFalse(first.overlaps(after))
+    }
 }

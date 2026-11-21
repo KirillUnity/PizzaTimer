@@ -52,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.clockplannerproject.R
+import com.example.clockplannerproject.kit.core.DayStateStats
 import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.TaskId
 import com.example.clockplannerproject.kit.core.TaskReport
@@ -155,6 +156,7 @@ fun ReportsScreen(
                 enabled = !state.isCollecting,
                 onIntent = onIntent,
             )
+            DayStatsCard(stats = state.dayStats)
         }
         if (!state.isLoading && state.reports.isEmpty()) {
             item(key = "empty") {
@@ -206,6 +208,35 @@ private fun ReportsEmptyCard(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 32.dp),
         )
+    }
+}
+
+@Composable
+private fun DayStatsCard(stats: DayStateStats) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        colors = CardDefaults.cardColors(containerColor = SandRest),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.day_stats_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.day_stats_self_report))
+            Text(stringResource(R.string.day_stats_states, stats.states.joinToString()))
+            Text(stringResource(R.string.day_stats_marks, stats.hindranceCount, stats.challengeCount))
+            Text(stringResource(R.string.day_stats_thoughts))
+            Text(stats.thoughts.joinToString())
+            Text(stringResource(R.string.day_stats_skill, stats.meanSkill))
+            Text(stringResource(R.string.day_stats_easier))
+            Text(stats.easier.joinToString())
+            Text(stringResource(R.string.day_stats_started, stats.startedCount))
+            Text(stringResource(R.string.day_stats_form))
+            Text(
+                if (stats.formProfile.isEmpty()) {
+                    ""
+                } else {
+                    stats.formProfile.joinToString { String.format(java.util.Locale.US, "%.1f", it) }
+                },
+            )
+        }
     }
 }
 

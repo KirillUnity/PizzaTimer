@@ -63,4 +63,25 @@ class TaskDraftValidatorTest {
     fun untimedNonEmptyTitle_isValid() {
         assertNull(TaskDraftValidator.validate(title = "Inbox", blocks = emptyList()))
     }
+
+    @Test
+    fun overlappingSameDay_isError() {
+        val first = TimeBlock(9 * 60, 10 * 60)
+        val second = TimeBlock(9 * 60 + 30, 10 * 60 + 30)
+        assertEquals(
+            TaskDraftError.OverlappingPeriod,
+            TaskDraftValidator.validate(
+                title = "Copy",
+                blocks = listOf(second),
+                occupying = listOf(first),
+            ),
+        )
+        assertNull(
+            TaskDraftValidator.validate(
+                title = "After",
+                blocks = listOf(TimeBlock(10 * 60, 11 * 60)),
+                occupying = listOf(first),
+            ),
+        )
+    }
 }

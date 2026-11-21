@@ -6,21 +6,43 @@ import androidx.lifecycle.viewModelScope
 import com.example.clockplannerproject.data.InMemoryAppearanceRepository
 import com.example.clockplannerproject.data.InMemoryFlowMemoryStore
 import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
+import com.example.clockplannerproject.data.InMemoryCourseHistoryStore
+import com.example.clockplannerproject.data.InMemoryGoalBookStore
+import com.example.clockplannerproject.data.InMemoryReportRepository
 import com.example.clockplannerproject.data.SampleDaySeeder
 import com.example.clockplannerproject.kit.core.Appearance
 import com.example.clockplannerproject.kit.core.AppearanceRepository
+import com.example.clockplannerproject.kit.core.BreakSession
 import com.example.clockplannerproject.kit.core.FlowMemorySnapshot
 import com.example.clockplannerproject.kit.core.FlowMemoryStore
 import com.example.clockplannerproject.kit.core.DialHalf
 import com.example.clockplannerproject.kit.core.RecurrenceMaterializer
+import com.example.clockplannerproject.kit.core.BuiltInCourse
+import com.example.clockplannerproject.kit.core.BuiltInPractice
+import com.example.clockplannerproject.kit.core.CourseHistoryStore
+import com.example.clockplannerproject.kit.core.DemandMark
+import com.example.clockplannerproject.kit.core.DifficultyNudge
+import com.example.clockplannerproject.kit.core.GoalBook
+import com.example.clockplannerproject.kit.core.GoalBookStore
+import com.example.clockplannerproject.kit.core.HardenKind
+import com.example.clockplannerproject.kit.core.PracticePass
+import com.example.clockplannerproject.kit.core.ReportRepository
+import com.example.clockplannerproject.kit.core.ShortFlowScale
 import com.example.clockplannerproject.kit.core.Task
+import com.example.clockplannerproject.kit.core.TaskCompletion
+import com.example.clockplannerproject.kit.core.TaskCompletionCodec
 import com.example.clockplannerproject.kit.core.TaskId
+import com.example.clockplannerproject.kit.core.TaskReport
 import com.example.clockplannerproject.kit.core.TaskInstances
 import com.example.clockplannerproject.kit.core.TaskRepository
+import com.example.clockplannerproject.kit.core.placeOnDate
+import com.example.clockplannerproject.kit.core.showingTemplateFaces
 import com.example.clockplannerproject.kit.core.TaskStatus
 import com.example.clockplannerproject.kit.core.TaskTimer
+import com.example.clockplannerproject.kit.core.TimeBlock
 import com.example.clockplannerproject.kit.core.TimeProvider
 import com.example.clockplannerproject.kit.core.ViewMode
+import com.example.clockplannerproject.kit.core.time.SessionDuration
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import com.example.clockplannerproject.kit.core.PauseMood
 import com.example.clockplannerproject.kit.core.practice.PracticeProgressStore
@@ -62,6 +84,9 @@ class DayViewModel(
     private val appearanceRepository: AppearanceRepository = InMemoryAppearanceRepository(),
     private val flowMemory: FlowMemoryStore = InMemoryFlowMemoryStore(),
     private val practice: PracticeProgressStore = InMemoryPracticeProgressStore(),
+    private val reports: ReportRepository = InMemoryReportRepository(),
+    private val goals: GoalBookStore = InMemoryGoalBookStore(),
+    private val courseHistory: CourseHistoryStore = InMemoryCourseHistoryStore(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DayUiState())
@@ -77,6 +102,8 @@ class DayViewModel(
     private val materializer = RecurrenceMaterializer(taskRepository)
     private var latestAppearance = Appearance.Default
     private var appearanceReady = false
+    private val budgets = mutableMapOf<TaskId, Int>()
+    private val chimed = mutableSetOf<TaskId>()
 
     init {
         viewModelScope.launch {
@@ -94,6 +121,7 @@ class DayViewModel(
             }
         }
         observeDay()
+        watchBudgets()
     }
 
     fun onIntent(intent: DayUiIntent) {
@@ -114,10 +142,12 @@ class DayViewModel(
             is DayUiIntent.OpenTaskDetails -> {
                 _state.update {
                     val task = intent.task ?: it.selectedTask
-                    if (task == null) {
-                        it
-                    } else {
-                        it.copy(selectedTask = task, detailsOpen = true)
+                    when {
+                        task == null -> it
+                        it.selectedTask?.id == task.id && it.detailsOpen -> {
+                            it.copy(selectedTask = null, detailsOpen = false)
+                        }
+                        else -> it.copy(selectedTask = task, detailsOpen = true)
                     }
                 }
                 refreshFlowChrome()
@@ -162,18 +192,32 @@ class DayViewModel(
             DayUiIntent.ToggleHideCompleted -> _state.update {
                 it.copy(hideCompleted = !it.hideCompleted)
             }
-            is DayUiIntent.SetViewMode -> {
-                _state.update { it.copy(viewMode = intent.mode) }
-                if (appearanceReady) {
-                    persistAppearance(latestAppearance.copy(viewMode = intent.mode))
-                }
-            }
+            is DayUiIntent.SetViewMode -> applyLook(latestAppearance.copy(viewMode = intent.mode))
+            is DayUiIntent.SetLook -> applyLook(
+                latestAppearance.copy(
+                    viewMode = intent.appearance.viewMode,
+                    accentArgb = intent.appearance.accentArgb,
+                    completedArgb = intent.appearance.completedArgb,
+                    background = intent.appearance.background,
+                ),
+            )
             DayUiIntent.DuplicateTask -> duplicateSelected()
             DayUiIntent.RequestMove -> _state.update { it.copy(showMovePicker = it.selectedTask != null) }
             DayUiIntent.DismissMove -> _state.update { it.copy(showMovePicker = false) }
             is DayUiIntent.ConfirmMove -> moveSelected(intent.date)
-            DayUiIntent.StartTimer -> startTimer()
+            DayUiIntent.StartTimer -> startTimer(durationMinutes = null)
+            is DayUiIntent.StartFor -> startTimer(durationMinutes = intent.minutes)
             DayUiIntent.PauseTimer -> pauseTimer()
+            DayUiIntent.ContinueBreak -> continueBreak()
+            DayUiIntent.FinishBreak -> finishBreak()
+            is DayUiIntent.EditCompletion -> _state.update { it.copy(completion = intent.draft) }
+            DayUiIntent.SubmitCompletion -> submitCompletion()
+            DayUiIntent.OpenCompletion -> openCompletion(null)
+            is DayUiIntent.OpenIntervalCompletion -> openCompletion(intent.blockIndex)
+            DayUiIntent.DismissCompletion -> _state.update { it.copy(completion = CompletionDraft()) }
+            DayUiIntent.SkipNudge -> skipNudge()
+            is DayUiIntent.AcceptNudge -> acceptNudge(intent.kind)
+            is DayUiIntent.FinishCourse -> finishCourse(intent.practice, intent.checked)
             DayUiIntent.PreviousDay -> shiftDate(-1)
             DayUiIntent.NextDay -> shiftDate(1)
             DayUiIntent.OpenDatePicker -> _state.update { it.copy(showDatePicker = true) }
@@ -217,6 +261,22 @@ class DayViewModel(
                 pauseMood = PauseMood.Calm,
             )
         }
+    }
+
+    /**
+     * Shows [next] at once and, once the stored look has loaded, writes it
+     * to the same repository Settings uses.
+     */
+    private fun applyLook(next: Appearance) {
+        _state.update {
+            it.copy(
+                viewMode = next.viewMode,
+                accentArgb = next.accentArgb,
+                completedArgb = next.completedArgb,
+                background = next.background,
+            )
+        }
+        if (appearanceReady) persistAppearance(next)
     }
 
     private fun persistAppearance(next: Appearance) {
@@ -269,7 +329,10 @@ class DayViewModel(
                                 materializer.ensureVisibleDay(date)
                                 lastMaterialized = date
                             }
-                            taskRepository.observeTasks(date).map { tasks ->
+                            taskRepository.observeAll().map { all ->
+                                val tasks = all
+                                    .filter { it.date == date }
+                                    .showingTemplateFaces(all)
                                 val current = _state.value
                                 val selected = current.selectedTask?.id?.let { id ->
                                     tasks.find { it.id == id }
@@ -293,6 +356,7 @@ class DayViewModel(
                                 }
                                 DayUiState(
                                     date = date,
+                                    localToday = timeProvider.today(),
                                     now = time,
                                     tasks = tasks,
                                     selectedTask = selected,
@@ -309,6 +373,11 @@ class DayViewModel(
                                     accentArgb = latestAppearance.accentArgb,
                                     completedArgb = latestAppearance.completedArgb,
                                     background = latestAppearance.background,
+                                    sessionMinutesLeft = selected?.id?.let { id ->
+                                        budgets[id]?.let { end ->
+                                            (end - TimeMath.minuteOfDay(time).toInt()).coerceAtLeast(0)
+                                        }
+                                    },
                                     showMovePicker = current.showMovePicker,
                                     showDatePicker = current.showDatePicker,
                                     dialHalf = half,
@@ -319,6 +388,8 @@ class DayViewModel(
                                     resumeMood = if (showChip) checkpoint?.mood else null,
                                     showDayClose = memory.isDayCloseVisible(date) &&
                                         !current.pauseSlipOpen,
+                                    completion = current.completion,
+                                    difficultyOffer = current.difficultyOffer,
                                 )
                             }
                         }
@@ -438,7 +509,9 @@ class DayViewModel(
         val task = _state.value.selectedTask ?: return
         viewModelScope.launch {
             try {
-                taskRepository.upsert(TaskInstances.moved(task, date))
+                placeOnDate(taskRepository, task, date) {
+                    TaskId(UUID.randomUUID().toString())
+                }
                 _state.update {
                     it.copy(selectedTask = null, detailsOpen = false, showMovePicker = false)
                 }
@@ -452,14 +525,32 @@ class DayViewModel(
         }
     }
 
-    private fun startTimer() {
-        val task = _state.value.selectedTask ?: return
+    private fun startTimer(durationMinutes: Int?) {
         val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        val selected = _state.value.selectedTask
+        val task = if (selected != null) {
+            selected
+        } else {
+            if (_state.value.tasks.any { TaskTimer.hasOpenBlock(it) }) return
+            val date = _state.value.date ?: return
+            Task(
+                id = TaskId(UUID.randomUUID().toString()),
+                title = "",
+                colorArgb = latestAppearance.accentArgb,
+                date = date,
+            )
+        }
         if (!TaskTimer.canStart(task)) return
-        _state.update { it.copy(pauseSlipOpen = false) }
-        val started = TaskTimer.start(task, now)
+        closeOpenBreak(now)
+        val started = TaskTimer.start(task, now, plannedMinutes = durationMinutes)
+        if (durationMinutes != null) {
+            val start = started.blocks.lastOrNull { it.isOpen }?.startMinute ?: now
+            budgets[started.id] = SessionDuration.endMinute(start, durationMinutes)
+            chimed.remove(started.id)
+        }
+        _state.update { it.copy(selectedTask = started, pauseSlipOpen = false) }
         viewModelScope.launch {
-            flowMemory.clearCheckpoint(task.id)
+            if (selected != null) flowMemory.clearCheckpoint(selected.id)
             if (upsertOrReport(started)) {
                 practice.markTried(PracticeSkill.START)
             }
@@ -467,17 +558,240 @@ class DayViewModel(
     }
 
     private fun pauseTimer() {
-        val task = _state.value.selectedTask ?: return
-        val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        val snapshot = _state.value
+        val openBreak = BreakSession.openBreak(snapshot.tasks)
+        if (openBreak != null) {
+            val work = BreakSession.workId(openBreak)?.let { id ->
+                snapshot.tasks.find { it.id == id }
+            }
+            _state.update {
+                it.copy(
+                    selectedTask = work ?: it.selectedTask,
+                    pauseSlipOpen = false,
+                    showDayClose = false,
+                )
+            }
+            return
+        }
+        val task = snapshot.selectedTask?.takeUnless { BreakSession.isBreak(it) }
+            ?: snapshot.tasks.firstOrNull { !BreakSession.isBreak(it) && TaskTimer.hasOpenBlock(it) }
+            ?: return
+        if (!TaskTimer.hasOpenBlock(task)) return
+        val now = snapshot.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        val date = snapshot.date ?: return
+        val paused = TaskTimer.pause(task, now)
+        val breakTask = BreakSession.start(paused.copy(date = paused.date ?: date), now)
         _state.update {
             it.copy(
-                pauseSlipOpen = true,
+                pauseSlipOpen = false,
                 showDayClose = false,
-                pauseDraft = "",
-                pauseMood = PauseMood.Calm,
+                selectedTask = paused,
             )
         }
-        persistTimer(TaskTimer.pause(task, now))
+        viewModelScope.launch {
+            upsertOrReport(paused)
+            upsertOrReport(breakTask)
+            _state.update { it.copy(selectedTask = paused) }
+        }
+    }
+
+    private fun continueBreak() {
+        val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        val breakTask = BreakSession.openBreak(_state.value.tasks) ?: return
+        val workId = BreakSession.workId(breakTask) ?: return
+        val work = _state.value.tasks.find { it.id == workId } ?: return
+        if (!TaskTimer.canStart(work)) return
+        val closed = TaskTimer.pause(breakTask, now)
+        val started = TaskTimer.start(work, now)
+        _state.update { it.copy(pauseSlipOpen = false, selectedTask = started) }
+        viewModelScope.launch {
+            upsertOrReport(closed)
+            if (upsertOrReport(started)) {
+                practice.markTried(PracticeSkill.START)
+            }
+        }
+    }
+
+    private fun finishBreak() {
+        val now = _state.value.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return
+        val breakTask = BreakSession.openBreak(_state.value.tasks) ?: return
+        val workId = BreakSession.workId(breakTask)
+        val work = workId?.let { id -> _state.value.tasks.find { it.id == id } }
+        if (work == null) {
+            viewModelScope.launch {
+                try {
+                    taskRepository.delete(breakTask.id)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    effects.send(DayUiEffect.ShowMessageRes(R.string.error_task_delete))
+                }
+            }
+            return
+        }
+        val closed = TaskTimer.pause(breakTask, now)
+        _state.update {
+            it.copy(
+                pauseSlipOpen = false,
+                selectedTask = work,
+                detailsOpen = false,
+                completion = CompletionDraft(),
+            )
+        }
+        persistTimer(closed)
+        viewModelScope.launch { showCompletion(work, null) }
+    }
+
+    private fun openCompletion(blockIndex: Int?) {
+        val task = _state.value.selectedTask ?: return
+        viewModelScope.launch { showCompletion(task, blockIndex) }
+    }
+
+    /**
+     * Opens scores for one interval. [blockIndex] null uses the latest interval.
+     * The task itself stays at its current status.
+     */
+    private suspend fun showCompletion(task: Task, blockIndex: Int?) {
+        val index = blockIndex ?: task.blocks.indexOfLast { it.endMinute != null }
+            .takeIf { it >= 0 }
+            ?: task.blocks.lastIndex
+        if (index < 0) return
+        val (ready, block) = ensureBlockId(task, index)
+        val stored = reports.observeReports(ready.id).first()
+            .firstOrNull { it.id == TaskCompletionCodec.reportId(ready.id, block.id) }
+            ?.let { TaskCompletionCodec.decode(it.text) }
+        _state.update {
+            it.copy(
+                selectedTask = ready,
+                detailsOpen = false,
+                completion = CompletionDraft.from(ready, block.id, stored),
+            )
+        }
+    }
+
+    private suspend fun ensureBlockId(task: Task, index: Int): Pair<Task, TimeBlock> {
+        val block = task.blocks[index]
+        if (block.id.isNotBlank()) return task to block
+        val assigned = block.copy(id = java.util.UUID.randomUUID().toString())
+        val updated = task.copy(
+            blocks = task.blocks.mapIndexed { i, current -> if (i == index) assigned else current },
+        )
+        upsertOrReport(updated)
+        return updated to assigned
+    }
+
+    private fun submitCompletion() {
+        val draft = _state.value.completion
+        val taskId = draft.taskId ?: return
+        val blockId = draft.blockId ?: return
+        val task = _state.value.tasks.find { it.id == taskId } ?: return
+        if (draft.titleEditable && draft.title.isBlank()) return
+        val completion = TaskCompletion.orNull(
+            stateAfter = draft.stateAfter ?: TaskCompletion.DEFAULT_PROXY,
+            engagement = draft.engagement ?: TaskCompletion.DEFAULT_PROXY,
+            skill = draft.skill ?: TaskCompletion.DEFAULT_PROXY,
+            easier = draft.easier,
+            mark = draft.mark ?: DemandMark.CHALLENGE,
+            thoughts = draft.thoughts,
+            reframe = draft.reframe,
+            done = draft.done,
+            progress = draft.progress,
+            shortFlow = ShortFlowScale.profileOrNull(
+                draft.shortFlow.mapNotNull { it }.takeIf { it.size == ShortFlowScale.ITEM_COUNT },
+            ),
+        ) ?: return
+        val saved = if (draft.titleEditable) task.copy(title = draft.title.trim()) else task
+        val nextName = draft.nextTitle.trim()
+        val date = _state.value.date
+        _state.update {
+            it.copy(
+                completion = CompletionDraft(),
+                selectedTask = null,
+                detailsOpen = false,
+            )
+        }
+        viewModelScope.launch {
+            upsertOrReport(saved)
+            val reportId = TaskCompletionCodec.reportId(saved.id, blockId)
+            val existing = reports.observeReports(saved.id).first()
+                .firstOrNull { it.id == reportId }
+            reports.upsert(
+                TaskReport(
+                    id = reportId,
+                    taskId = saved.id,
+                    createdAtEpochMillis = existing?.createdAtEpochMillis
+                        ?: System.currentTimeMillis(),
+                    text = TaskCompletionCodec.encode(completion),
+                ),
+            )
+            if (nextName.isNotEmpty() && date != null) {
+                val next = Task(
+                    id = TaskId(UUID.randomUUID().toString()),
+                    title = nextName,
+                    colorArgb = latestAppearance.accentArgb,
+                    date = date,
+                )
+                upsertOrReport(next)
+                val book = goals.observe().first()
+                val intervalKey = GoalBook.intervalKey(saved.id.value, blockId)
+                val from = if (book.taskLinks[intervalKey] != null) intervalKey else saved.id.value
+                goals.save(book.inherit(from, next.id.value))
+            }
+            refreshNudge()
+        }
+    }
+
+    private val skippedNudges = mutableSetOf<String>()
+
+    private fun finishCourse(practice: BuiltInPractice, checked: Set<String>) {
+        val lesson = BuiltInCourse.lesson(practice)
+        if (!BuiltInCourse.checkpointsMet(lesson, checked)) return
+        val workOpen = _state.value.tasks.any { task ->
+            !BreakSession.isBreak(task) && TaskTimer.hasOpenBlock(task)
+        }
+        if (workOpen) return
+        viewModelScope.launch {
+            courseHistory.append(PracticePass(practice, System.currentTimeMillis()))
+        }
+    }
+
+    private fun skipNudge() {
+        val key = _state.value.difficultyOffer?.key ?: return
+        skippedNudges.add(key)
+        _state.update { it.copy(difficultyOffer = null) }
+    }
+
+    private fun acceptNudge(kind: HardenKind) {
+        val offer = _state.value.difficultyOffer ?: return
+        val next = _state.value.tasks.lastOrNull { task ->
+            task.title == offer.title && task.id.value !in offer.key.split('|')
+        } ?: _state.value.tasks.lastOrNull { it.title == offer.title }
+        _state.update { it.copy(difficultyOffer = null) }
+        if (next == null) return
+        val hardened = DifficultyNudge.apply(next, kind)
+        persistTimer(hardened)
+    }
+
+    private suspend fun refreshNudge() {
+        val tasks = taskRepository.observeAll().first()
+        val stored = reports.observeAllReports().first()
+        val rows = stored.mapNotNull { report ->
+            val completion = TaskCompletionCodec.decode(report.text) ?: return@mapNotNull null
+            val task = tasks.find { it.id == report.taskId } ?: return@mapNotNull null
+            DifficultyNudge.Row(
+                taskId = task.id.value,
+                title = task.title,
+                completion = completion,
+                at = report.createdAtEpochMillis,
+            )
+        }
+        val offer = DifficultyNudge.offer(rows, skippedNudges.toSet())
+        _state.update { it.copy(difficultyOffer = offer) }
+    }
+
+    private fun closeOpenBreak(now: Int) {
+        val breakTask = BreakSession.openBreak(_state.value.tasks) ?: return
+        persistTimer(TaskTimer.pause(breakTask, now))
     }
 
     private fun commitPause() {
@@ -542,6 +856,24 @@ class DayViewModel(
         }
     }
 
+    private fun watchBudgets() {
+        viewModelScope.launch {
+            state.collect { snapshot ->
+                val now = snapshot.now?.let { TimeMath.minuteOfDay(it).toInt() } ?: return@collect
+                val due = snapshot.tasks.filter { task ->
+                    TaskTimer.hasOpenBlock(task) && budgets[task.id]?.let { now >= it } == true
+                }
+                due.forEach { task ->
+                    val end = budgets.remove(task.id) ?: return@forEach
+                    if (chimed.add(task.id)) {
+                        effects.trySend(DayUiEffect.PlayChime)
+                    }
+                    persistTimer(TaskTimer.pause(task, end))
+                }
+            }
+        }
+    }
+
     private fun persistTimer(updated: Task) {
         viewModelScope.launch { upsertOrReport(updated) }
     }
@@ -573,14 +905,27 @@ class DayViewModel(
         val task = _state.value.pendingDelete ?: return
         viewModelScope.launch {
             try {
+                reports.observeReports(task.id).first().forEach { report ->
+                    reports.delete(report.id)
+                }
+                val wedges = if (BreakSession.isBreak(task)) {
+                    emptyList()
+                } else {
+                    BreakSession.wedgesFor(task.id, _state.value.tasks)
+                }
+                wedges.forEach { wedge -> taskRepository.delete(wedge.id) }
                 taskRepository.delete(task.id)
+                val gone = buildSet {
+                    add(task.id)
+                    wedges.forEach { add(it.id) }
+                }
                 _state.update {
                     it.copy(
                         pendingDelete = null,
                         selectedTask = it.selectedTask?.takeUnless { selected ->
-                            selected.id == task.id
+                            selected.id in gone
                         },
-                        detailsOpen = it.detailsOpen && it.selectedTask?.id != task.id,
+                        detailsOpen = it.detailsOpen && it.selectedTask?.id !in gone,
                     )
                 }
             } catch (cancelled: CancellationException) {

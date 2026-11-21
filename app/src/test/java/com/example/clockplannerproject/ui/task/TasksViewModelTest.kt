@@ -1,8 +1,10 @@
 package com.example.clockplannerproject.ui.task
 
 import com.example.clockplannerproject.data.InMemoryPracticeProgressStore
+import com.example.clockplannerproject.kit.core.BreakSession
 import com.example.clockplannerproject.data.MockPlannerSource
 import com.example.clockplannerproject.kit.core.Importance
+import com.example.clockplannerproject.kit.core.RecurrenceRule
 import com.example.clockplannerproject.kit.core.ReportId
 import com.example.clockplannerproject.kit.core.ReportRepository
 import com.example.clockplannerproject.kit.core.Task
@@ -62,6 +64,52 @@ class TasksViewModelTest {
     @After
     fun reset() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun createTodayQuick_savesUntimedOnSelectedDay() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
+        assertEquals(CreateStage.CHOOSER, viewModel.state.value.editor?.createStage)
+        viewModel.onIntent(TasksUiIntent.CreateTodayQuick("Новое дело"))
+
+        assertNull(viewModel.state.value.editor)
+        val saved = viewModel.state.value.tasks.single()
+        assertEquals("Новое дело", saved.title)
+        assertEquals(date, saved.date)
+        assertTrue(saved.isUntimed)
+    }
+
+    @Test
+    fun createTodayQuick_usesTypedTitle() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Почта"))
+        viewModel.onIntent(TasksUiIntent.CreateTodayQuick("Новое дело"))
+
+        val saved = viewModel.state.value.tasks.single()
+        assertEquals("Почта", saved.title)
+        assertEquals(date, saved.date)
+        assertTrue(saved.isUntimed)
+        assertNull(viewModel.state.value.editor)
+    }
+
+    @Test
+    fun createWizard_skipAll_savesDefaultName() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
+        viewModel.onIntent(TasksUiIntent.StartCreateWizard)
+        viewModel.onIntent(TasksUiIntent.CreateSkipStage)
+        viewModel.onIntent(TasksUiIntent.CreateSkipStage)
+        viewModel.onIntent(TasksUiIntent.CreateSkipStage)
+        assertEquals(CreateStage.DETAILS, viewModel.state.value.editor?.createStage)
+        viewModel.onIntent(TasksUiIntent.CreateFinishWizard("Новое дело"))
+
+        assertNull(viewModel.state.value.editor)
+        val saved = viewModel.state.value.tasks.single()
+        assertEquals("Новое дело", saved.title)
+        assertEquals(Importance.MEDIUM, saved.importance)
+        assertTrue(saved.isUntimed)
     }
 
     @Test
@@ -142,6 +190,112 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun update_rejectsOverlappingPeriod() {
+        val existing = Task(
+            id = TaskId("kept"),
+            title = "Focus",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(existing)),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+        )
+        viewModel.onIntent(TasksUiIntent.CreateForSelectedDay)
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Copy"))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
+        viewModel.onIntent(TasksUiIntent.ChangeBlockStart(0, 9 * 60))
+        viewModel.onIntent(TasksUiIntent.ChangeBlockEnd(0, 10 * 60))
+        viewModel.onIntent(TasksUiIntent.Update)
+        assertEquals(TaskDraftError.OverlappingPeriod, viewModel.state.value.editor?.error)
+        assertEquals(1, viewModel.state.value.tasks.size)
+    }
+
+    @Test
+    fun visibleTasks_hidesBreakWedges() {
+        val work = Task(
+            id = TaskId("kept"),
+            title = "Focus",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val wedge = BreakSession.start(work, 10 * 60)
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(work, wedge)),
+            FakeTimeProvider(date, LocalTime(10, 10)),
+            FakeReportRepository(),
+        )
+        assertEquals(listOf("Focus"), viewModel.state.value.visibleTasks.map { it.title })
+        assertTrue(viewModel.state.value.availableTags.none { it.equals("break", ignoreCase = true) })
+    }
+
+    @Test
+    fun closedInterval_canBeEditedRemoved_andKeepsExpectedApartFromActual() {
+        val task = Task(
+            id = TaskId("closed"),
+            title = "Focus",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(8 * 60, 9 * 60, id = "b1", plannedMinutes = 30)),
+            date = date,
+        )
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(task)),
+            FakeTimeProvider(date, LocalTime(12, 0)),
+            FakeReportRepository(),
+        )
+        viewModel.onIntent(TasksUiIntent.Edit(task))
+        viewModel.onIntent(TasksUiIntent.ChangeBlockStart(0, 8 * 60 + 15))
+        val edited = viewModel.state.value.editor!!.blocks.single()
+        assertEquals(8 * 60 + 15, edited.startMinute)
+        assertEquals(30, edited.plannedMinutes)
+        assertEquals(45, edited.actualMinutes(12 * 60))
+        viewModel.onIntent(TasksUiIntent.ChangePlannedMinutes(0, 60))
+        assertEquals(60, viewModel.state.value.editor!!.blocks.single().plannedMinutes)
+        viewModel.onIntent(TasksUiIntent.RemoveBlock(0))
+        assertTrue(viewModel.state.value.editor!!.blocks.isEmpty())
+    }
+
+    @Test
+    fun removeBlock_dropsUnclosed_keepsClosed() {
+        val viewModel = TasksViewModel(FakeTaskRepository(), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.Create)
+        viewModel.onIntent(TasksUiIntent.ChangeTitle("Focus"))
+        viewModel.onIntent(TasksUiIntent.ChangeScheduled(true))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
+        viewModel.onIntent(TasksUiIntent.ChangeBlockStart(0, 8 * 60))
+        viewModel.onIntent(TasksUiIntent.ChangeBlockEnd(0, 9 * 60))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
+        viewModel.onIntent(TasksUiIntent.ChangeBlockStart(1, 18 * 60))
+        viewModel.onIntent(TasksUiIntent.ChangeBlockEnd(1, 19 * 60))
+        viewModel.onIntent(TasksUiIntent.RemoveBlock(1))
+        assertEquals(1, viewModel.state.value.editor?.blocks?.size)
+        assertEquals(8 * 60, viewModel.state.value.editor?.blocks?.single()?.startMinute)
+    }
+
+    @Test
+    fun edit_startsCollapsed_toggleOpensName() {
+        val task = Task(
+            id = TaskId("keep"),
+            title = "Focus",
+            colorArgb = 0xFF3949AB,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(task)), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.Edit(task))
+        assertTrue(viewModel.state.value.editor?.expandedEditSections.isNullOrEmpty())
+
+        viewModel.onIntent(TasksUiIntent.ToggleEditSection(EditSection.NAME))
+        assertEquals(setOf(EditSection.NAME), viewModel.state.value.editor?.expandedEditSections)
+
+        viewModel.onIntent(TasksUiIntent.ToggleEditSection(EditSection.NAME))
+        assertTrue(viewModel.state.value.editor?.expandedEditSections.isNullOrEmpty())
+    }
+
+    @Test
     fun edit_updatesExistingTitle() {
         val task = Task(
             id = TaskId("keep"),
@@ -176,6 +330,48 @@ class TasksViewModelTest {
 
         assertTrue(viewModel.state.value.tasks.isEmpty())
         assertNull(viewModel.state.value.pendingDelete)
+    }
+
+    @Test
+    fun confirmDeleteSelected_removesMarked_keepsOthers() {
+        val keep = Task(
+            id = TaskId("keep"),
+            title = "Keep",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val goneA = Task(
+            id = TaskId("a"),
+            title = "A",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(11 * 60, 12 * 60)),
+            date = date,
+        )
+        val goneB = Task(
+            id = TaskId("b"),
+            title = "B",
+            colorArgb = TaskPalette.defaultColor,
+            blocks = listOf(TimeBlock(13 * 60, 14 * 60)),
+            date = date,
+        )
+        val viewModel = TasksViewModel(
+            FakeTaskRepository(listOf(keep, goneA, goneB)),
+            FakeTimeProvider(date),
+            FakeReportRepository(),
+        )
+        viewModel.onIntent(TasksUiIntent.ToggleTaskSelection(goneA.id))
+        viewModel.onIntent(TasksUiIntent.ToggleTaskSelection(goneB.id))
+        viewModel.onIntent(TasksUiIntent.RequestDeleteSelected)
+        viewModel.onIntent(TasksUiIntent.DismissDelete)
+        assertEquals(3, viewModel.state.value.tasks.size)
+        assertEquals(setOf(goneA.id, goneB.id), viewModel.state.value.selectedTaskIds)
+
+        viewModel.onIntent(TasksUiIntent.RequestDeleteSelected)
+        viewModel.onIntent(TasksUiIntent.ConfirmDelete)
+        assertEquals(listOf("Keep"), viewModel.state.value.tasks.map { it.title })
+        assertTrue(viewModel.state.value.selectedTaskIds.isEmpty())
+        assertFalse(viewModel.state.value.pendingBulkDelete)
     }
 
     @Test
@@ -245,7 +441,7 @@ class TasksViewModelTest {
             id = TaskId("keep"),
             title = "Focus",
             colorArgb = 0xFF3949AB,
-            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            blocks = emptyList(),
             date = date,
             project = "code",
         )
@@ -278,6 +474,61 @@ class TasksViewModelTest {
         viewModel.onIntent(TasksUiIntent.SelectDate(dest))
         assertEquals("Focus", viewModel.state.value.tasks.single().title)
         assertEquals(task.id, viewModel.state.value.tasks.single().id)
+    }
+
+    @Test
+    fun confirmMove_daily_keepsTemplate_andAddsEmptySubtask() {
+        val template = Task(
+            id = TaskId("daily"),
+            title = "Standup",
+            colorArgb = 0xFF3949AB,
+            blocks = listOf(TimeBlock(9 * 60, 9 * 60 + 15)),
+            date = date,
+            recurrence = RecurrenceRule.Daily,
+            seriesId = "daily",
+        )
+        val dest = LocalDate(2026, 10, 8)
+        val repository = FakeTaskRepository(listOf(template))
+        val viewModel = TasksViewModel(repository, FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.RequestMove(template))
+        viewModel.onIntent(TasksUiIntent.ConfirmMove(dest))
+        val stored = viewModel.state.value.tasks
+        val kept = stored.single { it.id == template.id }
+        assertEquals(date, kept.date)
+        assertEquals(template.blocks, kept.blocks)
+        val subtask = stored.single { it.date == dest }
+        assertTrue(subtask.blocks.isEmpty())
+        assertEquals("daily", subtask.seriesId)
+        assertEquals(RecurrenceRule.None, subtask.recurrence)
+        viewModel.onIntent(TasksUiIntent.RequestMove(template))
+        viewModel.onIntent(TasksUiIntent.ConfirmMove(dest))
+        assertEquals(2, viewModel.state.value.tasks.size)
+    }
+
+    @Test
+    fun dailyEditor_savesIntervalOnlyOnChosenDate() {
+        val template = Task(
+            id = TaskId("daily"),
+            title = "Standup",
+            colorArgb = 0xFF3949AB,
+            blocks = emptyList(),
+            date = date,
+            recurrence = RecurrenceRule.Daily,
+            seriesId = "daily",
+        )
+        val other = date.plus(1, DateTimeUnit.DAY)
+        val viewModel = TasksViewModel(FakeTaskRepository(listOf(template)), FakeTimeProvider(date), FakeReportRepository())
+        viewModel.onIntent(TasksUiIntent.Edit(template))
+        assertNull(viewModel.state.value.editor?.intervalDate)
+        viewModel.onIntent(TasksUiIntent.AddBlock)
+        assertTrue(viewModel.state.value.editor!!.blocks.isEmpty())
+        viewModel.onIntent(TasksUiIntent.SelectIntervalDate(date))
+        viewModel.onIntent(TasksUiIntent.AddBlock)
+        viewModel.onIntent(TasksUiIntent.SelectIntervalDate(other))
+        val templateBlocks = viewModel.state.value.tasks.single { it.id == template.id }.blocks
+        assertEquals(1, templateBlocks.size)
+        assertTrue(viewModel.state.value.editor!!.blocks.isEmpty())
+        assertTrue(viewModel.state.value.tasks.none { it.date == other })
     }
 
     @Test

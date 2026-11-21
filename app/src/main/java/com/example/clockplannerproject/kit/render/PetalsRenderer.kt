@@ -45,7 +45,13 @@ object PetalsRenderer : DialRenderer {
         ring: RingLayout,
         geometry: GeometryConfig,
         paint: Paint,
-    ): List<PreparedArcLabel> = prepareArcLabels(sectors, ring, geometry, paint)
+    ): List<PreparedArcLabel> = prepareArcLabels(
+        sectors,
+        ring,
+        geometry,
+        paint,
+        radius = ring.midRadius,
+    )
 
     override fun prepareExtras(
         sectors: List<PreparedSector>,

@@ -11,6 +11,23 @@ class DialHalfTest {
     private val date = LocalDate(2026, 10, 6)
 
     @Test
+    fun nineOClock_keepsMinutesWhenOtherHalfIsSelected() {
+        val task = Task(
+            id = TaskId("nine"),
+            title = "Nine",
+            colorArgb = 0xFF5C6B73,
+            blocks = listOf(TimeBlock(9 * 60, 10 * 60)),
+            date = date,
+        )
+        val stored = task.blocks
+        val morning = clipTaskToHalf(task, DialHalf.AM).single()
+        assertTrue(clipTaskToHalf(task, DialHalf.PM).isEmpty())
+        assertEquals(9 * 60, morning.startMinute)
+        assertEquals(10 * 60, morning.endMinute)
+        assertEquals(stored, task.blocks)
+    }
+
+    @Test
     fun workBlock_isAmOnly() {
         val work = SampleTasks.typicalDay(date).first { it.id.value == "work" }
         val am = clipTaskToHalf(work, DialHalf.AM)

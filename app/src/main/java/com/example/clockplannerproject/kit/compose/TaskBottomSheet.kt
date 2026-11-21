@@ -50,6 +50,8 @@ fun TaskBottomSheet(
     onDelete: () -> Unit = {},
     onDuplicate: () -> Unit = {},
     onMove: () -> Unit = {},
+    onEditScores: () -> Unit = {},
+    onScoreInterval: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -69,6 +71,11 @@ fun TaskBottomSheet(
             onDelete = onDelete,
             onDuplicate = onDuplicate,
             onMove = onMove,
+            onEditScores = onEditScores,
+            intervals = task.blocks.map { block ->
+                TimeMath.formatRange(block.startMinute, block.endMinute)
+            },
+            onScoreInterval = onScoreInterval,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Spacer(Modifier.height(24.dp))
@@ -140,6 +147,9 @@ fun TaskBottomSheetActions(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit = {},
     onMove: () -> Unit = {},
+    onEditScores: () -> Unit = {},
+    intervals: List<String> = emptyList(),
+    onScoreInterval: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -162,6 +172,17 @@ fun TaskBottomSheetActions(
             }
             TextButton(onClick = onDuplicate) {
                 Text(stringResource(R.string.task_duplicate))
+            }
+            if (intervals.isEmpty()) {
+                TextButton(onClick = onEditScores) {
+                    Text(stringResource(R.string.completion_edit))
+                }
+            } else {
+                intervals.forEachIndexed { index, label ->
+                    TextButton(onClick = { onScoreInterval(index) }) {
+                        Text(stringResource(R.string.task_interval_score, label))
+                    }
+                }
             }
             TextButton(onClick = onEdit) {
                 Text(stringResource(R.string.task_edit))

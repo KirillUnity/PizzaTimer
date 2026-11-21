@@ -60,4 +60,75 @@ class ArcLabelTest {
     fun contrastingLabel_isDarkOnLightSector() {
         assertEquals(0xFF1C1B1FL, contrastingLabelArgb(0xFFE8E0D0))
     }
+
+    @Test
+    fun labelArc_reversesOnLowerHalf() {
+        val upper = sectorLabelArcPath(100f, 100f, 50f, 200f, 80f, reverse = false)
+        val lower = sectorLabelArcPath(100f, 100f, 50f, 20f, 80f, reverse = true)
+        assertFalse(upper.isEmpty)
+        assertFalse(lower.isEmpty)
+        assertTrue(canvasAngleIsLowerHalf(90f))
+        assertFalse(canvasAngleIsLowerHalf(270f))
+    }
+
+    @Test
+    fun prepareArcLabels_centersOnArc() {
+        val ring = layoutRing(
+            androidx.compose.ui.geometry.Size(400f, 400f),
+            com.example.clockplannerproject.kit.core.config.GeometryConfig.Default,
+        )
+        val sector = PreparedSector(
+            canvasStartDeg = 0f,
+            canvasMidDeg = 90f,
+            sweepDeg = 180f,
+            color = androidx.compose.ui.graphics.Color(0xFFA8C5A0),
+            title = "английский",
+            labelArgb = 0xFF1C1B1F.toInt(),
+            isSelected = false,
+        )
+        val paint = android.graphics.Paint().apply { textSize = 24f }
+        val labels = prepareArcLabels(
+            sectors = listOf(sector),
+            ring = ring,
+            geometry = com.example.clockplannerproject.kit.core.config.GeometryConfig.Default,
+            paint = paint,
+            radius = ring.midRadius,
+        )
+        val label = labels.single()
+        assertEquals("английский", label.text)
+        assertFalse(label.path.isEmpty)
+        val arcLength = ring.midRadius * Math.toRadians(180.0).toFloat()
+        val expected = (arcLength - paint.measureText(label.text)) / 2f
+        assertEquals(expected, label.hOffset, 0.5f)
+    }
+
+    @Test
+    fun dialLabels_sitOnStrokeCenterline() {
+        val ring = layoutRing(
+            androidx.compose.ui.geometry.Size(400f, 400f),
+            com.example.clockplannerproject.kit.core.config.GeometryConfig.Default,
+        )
+        val sector = PreparedSector(
+            canvasStartDeg = 0f,
+            canvasMidDeg = 90f,
+            sweepDeg = 180f,
+            color = androidx.compose.ui.graphics.Color(0xFFEADBCE),
+            title = "Отдых",
+            labelArgb = 0xFF1C1B1F.toInt(),
+            isSelected = false,
+        )
+        val paint = android.graphics.Paint().apply { textSize = 24f }
+        val labels = TimeDialRenderer.prepareLabels(
+            sectors = listOf(sector),
+            ring = ring,
+            geometry = com.example.clockplannerproject.kit.core.config.GeometryConfig.Default,
+            paint = paint,
+        )
+        val label = labels.single()
+        assertEquals(ring.center.x, label.x, 0.5f)
+        assertEquals(ring.center.y + ring.bandCenterRadius, label.y, 0.5f)
+        val arcLength = ring.bandCenterRadius * Math.toRadians(180.0).toFloat()
+        val expected = (arcLength - paint.measureText(label.text)) / 2f
+        assertEquals(expected, label.hOffset, 0.5f)
+    }
 }

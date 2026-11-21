@@ -57,6 +57,7 @@ data class TimeBlockEntity(
     val startMinute: Int,
     val endMinute: Int?,
     val sortIndex: Int,
+    val plannedMinutes: Int? = null,
 )
 
 /**

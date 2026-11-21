@@ -20,6 +20,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.clockplannerproject.R
@@ -34,7 +35,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 
 /**
- * Two 12-hour rings (AM / PM). Horizontal swipe switches halves.
+ * Two 12-hour rings (before noon / after noon). Horizontal swipe switches halves.
  * Tasks that cross noon or midnight are split across both faces.
  * One-finger tap or long-press resize; two-finger twist rotates the scene.
  * Swipe in the hole pages AM/PM.
@@ -56,6 +57,8 @@ fun DualTimeDial(
     onResizeCancel: () -> Unit = {},
     onStartTimer: () -> Unit = {},
     onPauseTimer: () -> Unit = {},
+    minutesLeft: Int? = null,
+    sessionPaused: Boolean = false,
     onDismissSelection: () -> Unit = {},
     onOpenDetails: () -> Unit = {},
     selectedHalf: DialHalf? = null,
@@ -112,6 +115,8 @@ fun DualTimeDial(
                     onResizeCancel = onResizeCancel,
                     onStartTimer = onStartTimer,
                     onPauseTimer = onPauseTimer,
+                    minutesLeft = minutesLeft,
+                    sessionPaused = sessionPaused,
                     onDismissSelection = onDismissSelection,
                     onOpenDetails = onOpenDetails,
                     modifier = Modifier.size(side),
@@ -128,7 +133,11 @@ fun DualTimeDial(
                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                         shape = SegmentedButtonDefaults.itemShape(index, halves.size),
                     ) {
-                        Text(stringResource(halfLabel(half)))
+                        Text(
+                            text = stringResource(halfLabel(half)),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }

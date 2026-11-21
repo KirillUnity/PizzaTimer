@@ -44,7 +44,9 @@ flowchart TB
 
 Ритм: **6 дней фич + 1 день полировка / тесты / тег версии**. Промпты: [DAILY_PROMPTS.md](DAILY_PROMPTS.md). Спека: [TZ.md](TZ.md).
 
-Следующие продуктовые шаги (ДО/ПО, боковое меню, Play, перерыв, статистика, удаление) — в [ROADMAP_NEXT.md](ROADMAP_NEXT.md). Этот файл остаётся планом шести недель до 1.0.
+Следующие улучшения после живого дня — в [ROADMAP_IMPROVE.md](ROADMAP_IMPROVE.md). Первая волна дня (что уже собирали) остаётся в [ROADMAP_NEXT.md](ROADMAP_NEXT.md). Этот файл — план шести недель до 1.0-android.
+
+Ремесло внимания (миссия §6.3) на эту шестёрку недель не ставится. Один фронт дня, строка «что дальше» и перерыв как отход — волна Б2 в карте улучшений. Шесть недель по-прежнему собирают циферблат, а не второй продукт.
 
 ### Анализ ТЗ
 
@@ -187,6 +189,8 @@ flowchart TB
 ```
 
 Cadence: **6 feature days + 1 polish / tests / version tag**. Daily prompts: [DAILY_PROMPTS.md](DAILY_PROMPTS.md). Spec: [TZ.md](TZ.md).
+
+Attention craft from mission §6.3 is not part of these six weeks. One daily front, the “what’s next” line, and the break as a step away live in wave B2 of [ROADMAP_IMPROVE.md](ROADMAP_IMPROVE.md). These six weeks still build the dial.
 
 ### TZ analysis
 

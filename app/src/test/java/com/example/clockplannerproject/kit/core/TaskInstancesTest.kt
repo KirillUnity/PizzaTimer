@@ -4,6 +4,7 @@ import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TaskInstancesTest {
@@ -42,5 +43,30 @@ class TaskInstancesTest {
         val edited = copy.copy(title = "Copy title")
         assertEquals("Focus", original.title)
         assertEquals("Copy title", edited.title)
+    }
+
+    @Test
+    fun daySubtask_hasNoIntervals_andKeepsSeries() {
+        val template = original.copy(recurrence = RecurrenceRule.Daily, seriesId = "orig")
+        val subtask = TaskInstances.daySubtask(template, tuesday, TaskId("tue"))
+        assertEquals(TaskId("tue"), subtask.id)
+        assertEquals(tuesday, subtask.date)
+        assertTrue(subtask.blocks.isEmpty())
+        assertEquals(RecurrenceRule.None, subtask.recurrence)
+        assertEquals("orig", subtask.seriesId)
+        assertEquals(template.blocks, template.blocks)
+    }
+
+    @Test
+    fun withTemplateFace_renamesShownTitle_keepsInterval() {
+        val template = original.copy(recurrence = RecurrenceRule.Daily, seriesId = "orig")
+        val subtask = TaskInstances.daySubtask(template, tuesday, TaskId("tue"))
+            .copy(blocks = listOf(TimeBlock(14 * 60, 15 * 60)), title = "Old")
+        val shown = subtask.withTemplateFace(template.copy(title = "Renamed"))
+        assertEquals("Renamed", shown.title)
+        assertEquals(subtask.blocks, shown.blocks)
+        assertEquals(subtask.id, shown.id)
+        assertEquals(subtask.date, shown.date)
+        assertEquals(subtask.status, shown.status)
     }
 }

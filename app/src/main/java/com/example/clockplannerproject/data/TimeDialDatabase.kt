@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 /**
  * Local TimeDial database.
  *
- * Schema v7:
+ * Schema v9:
  * `tasks(..., project, tags)`, `time_blocks(...)`,
  * `task_reports(..., text, attachmentRelativePath, attachmentDisplayName, attachmentMimeType)`.
  * [tags] is user-created labels, not a fixed catalog.
@@ -22,7 +22,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [TaskEntity::class, TimeBlockEntity::class, TaskReportEntity::class],
-    version = 7,
+    version = 9,
     exportSchema = false,
 )
 abstract class TimeDialDatabase : RoomDatabase() {

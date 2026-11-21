@@ -34,7 +34,14 @@ class TaskMappersTest {
             seriesId = "task-2",
         )
         val restored = original.toEntity().toDomain(original.toBlockEntities())
-        assertEquals(original, restored)
+        assertEquals(
+            original.copy(
+                blocks = original.blocks.mapIndexed { index, block ->
+                    block.copy(id = "${original.id.value}-$index")
+                },
+            ),
+            restored,
+        )
     }
 
     @Test

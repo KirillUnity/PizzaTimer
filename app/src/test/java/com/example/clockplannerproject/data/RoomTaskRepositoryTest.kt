@@ -34,7 +34,7 @@ class RoomTaskRepositoryTest {
 
         val forDate = repository.observeTasks(date).first()
         assertEquals(1, forDate.size)
-        assertEquals(task, forDate.single())
+        assertEquals(withStoredBlockIds(task), forDate.single())
 
         val otherDay = repository.observeTasks(LocalDate(2026, 10, 7)).first()
         assertTrue(otherDay.isEmpty())
@@ -76,7 +76,7 @@ class RoomTaskRepositoryTest {
         assertTrue(repository.observeTasks(source).first().isEmpty())
         val moved = repository.observeTasks(dest).first().single()
         assertEquals(task.id, moved.id)
-        assertEquals(task.blocks, moved.blocks)
+        assertEquals(withStoredBlockIds(task).blocks, moved.blocks)
         assertEquals(task.project, moved.project)
     }
 
@@ -129,6 +129,12 @@ class RoomTaskRepositoryTest {
         assertTrue(repository.observeUnscheduled().first().isEmpty())
         assertEquals(backlog.id, repository.observeTasks(target).first().single().id)
     }
+
+    private fun withStoredBlockIds(task: Task): Task = task.copy(
+        blocks = task.blocks.mapIndexed { index, block ->
+            block.copy(id = block.id.ifBlank { "${task.id.value}-$index" })
+        },
+    )
 
     private fun sample(date: LocalDate) = Task(
         id = TaskId("task-1"),

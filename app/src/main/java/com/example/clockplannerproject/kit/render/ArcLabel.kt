@@ -1,6 +1,8 @@
 package com.example.clockplannerproject.kit.render
 
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import com.example.clockplannerproject.kit.core.config.GeometryConfig
 import com.example.clockplannerproject.kit.core.time.TimeMath
 import kotlin.math.cos
@@ -9,7 +11,9 @@ import kotlin.math.sin
 private const val ELLIPSIS = "..."
 
 /**
- * Tangent label at a sector midpoint. Built in `drawWithCache`, not in `draw()`.
+ * Title along a sector arc. [path] is built in `drawWithCache`, not in `draw()`.
+ * An empty [path] means a straight tangent at ([x], [y]) with [rotationDeg]
+ * (pizza radial helper).
  *
  * @since 0.2.0
  */
@@ -20,6 +24,8 @@ data class PreparedArcLabel(
     val text: String,
     val vOffset: Float,
     val colorArgb: Int,
+    val path: Path = Path(),
+    val hOffset: Float = 0f,
 )
 
 /**
@@ -90,8 +96,11 @@ fun ellipsizeLabel(
 }
 
 /**
- * Builds midpoint tangent labels. No [android.graphics.Path] allocation.
+ * Builds titles on a circular arc of [radius]. Paths are created here, not in `draw()`.
+ * The dial passes [RingLayout.bandCenterRadius] so glyphs sit on the painted stroke.
+ * Petals pass [RingLayout.midRadius].
  *
+ * @param radius distance from the ring center to the label baseline
  * @since 0.2.0
  */
 fun prepareArcLabels(
@@ -99,19 +108,25 @@ fun prepareArcLabels(
     ring: RingLayout,
     geometry: GeometryConfig,
     paint: Paint,
+    radius: Float,
 ): List<PreparedArcLabel> {
     val metrics = paint.fontMetrics
-    val vOffset = -(metrics.ascent + metrics.descent) / 2f
+    val vOffset = if (metrics == null) {
+        0f
+    } else {
+        -(metrics.ascent + metrics.descent) / 2f
+    }
     return sectors.mapNotNull { sector ->
         if (sector.sweepDeg < geometry.minSweepForLabelDeg) return@mapNotNull null
         val sweepRad = Math.toRadians(sector.sweepDeg.toDouble()).toFloat()
-        val arcLength = ring.midRadius * sweepRad
+        val arcLength = radius * sweepRad
         val maxWidth = arcLength * geometry.labelWidthFractionOfArc
         val text = ellipsizeLabel(sector.title, maxWidth) { paint.measureText(it) }
         if (text.isEmpty()) return@mapNotNull null
+        val textWidth = paint.measureText(text)
         val canvasRad = Math.toRadians(sector.canvasMidDeg.toDouble())
-        val x = ring.center.x + ring.midRadius * cos(canvasRad).toFloat()
-        val y = ring.center.y + ring.midRadius * sin(canvasRad).toFloat()
+        val x = ring.center.x + radius * cos(canvasRad).toFloat()
+        val y = ring.center.y + radius * sin(canvasRad).toFloat()
         PreparedArcLabel(
             x = x,
             y = y,
@@ -119,6 +134,44 @@ fun prepareArcLabels(
             text = text,
             vOffset = vOffset,
             colorArgb = sector.labelArgb,
+            path = sectorLabelArcPath(
+                centerX = ring.center.x,
+                centerY = ring.center.y,
+                radius = radius,
+                canvasStartDeg = sector.canvasStartDeg,
+                sweepDeg = sector.sweepDeg,
+                reverse = canvasAngleIsLowerHalf(sector.canvasMidDeg),
+            ),
+            hOffset = ((arcLength - textWidth) / 2f).coerceAtLeast(0f),
         )
     }
+}
+
+/**
+ * Circular baseline for [drawTextOnPath]. [reverse] walks the arc backward
+ * so glyphs on the lower half stay upright.
+ *
+ * @since 1.2.0
+ */
+fun sectorLabelArcPath(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    canvasStartDeg: Float,
+    sweepDeg: Float,
+    reverse: Boolean,
+): Path {
+    val path = Path()
+    val oval = RectF(
+        centerX - radius,
+        centerY - radius,
+        centerX + radius,
+        centerY + radius,
+    )
+    if (reverse) {
+        path.addArc(oval, canvasStartDeg + sweepDeg, -sweepDeg)
+    } else {
+        path.addArc(oval, canvasStartDeg, sweepDeg)
+    }
+    return path
 }

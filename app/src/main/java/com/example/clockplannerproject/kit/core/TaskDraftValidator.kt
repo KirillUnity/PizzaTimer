@@ -11,6 +11,7 @@ import com.example.clockplannerproject.kit.core.time.TimeMath
 sealed interface TaskDraftError {
     data object EmptyTitle : TaskDraftError
     data object EndEqualsStart : TaskDraftError
+    data object OverlappingPeriod : TaskDraftError
 }
 
 /**
@@ -22,6 +23,8 @@ object TaskDraftValidator {
     fun validate(
         title: String,
         blocks: List<TimeBlock>,
+        occupying: List<TimeBlock> = emptyList(),
+        nowMinute: Int = 0,
     ): TaskDraftError? {
         if (title.isBlank()) return TaskDraftError.EmptyTitle
         for (block in blocks) {
@@ -29,6 +32,16 @@ object TaskDraftValidator {
             val endRaw = block.endMinute ?: continue
             val end = endRaw.mod(TimeMath.MINUTES_PER_DAY)
             if (start == end) return TaskDraftError.EndEqualsStart
+        }
+        for (i in blocks.indices) {
+            for (j in i + 1 until blocks.size) {
+                if (blocks[i].overlaps(blocks[j], nowMinute)) {
+                    return TaskDraftError.OverlappingPeriod
+                }
+            }
+        }
+        if (blocks.any { block -> occupying.any { other -> block.overlaps(other, nowMinute) } }) {
+            return TaskDraftError.OverlappingPeriod
         }
         return null
     }
